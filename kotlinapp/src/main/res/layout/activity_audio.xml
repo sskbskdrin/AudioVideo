@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:divider="@drawable/ic_launcher_background"
+              android:dividerPadding="5dp"
+              android:orientation="vertical">
+
+    <cn.sskbskdrin.record.audio.OSCView
+        android:id="@+id/osc"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"/>
+
+    <CheckBox
+        android:id="@+id/audio_file_check"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="是否存储录音文件"/>
+
+    <TextView
+        android:id="@+id/audio_file_path"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"/>
+
+    <RadioGroup
+        android:id="@+id/audio_radio_group"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <RadioButton
+            android:id="@+id/audio_8_s"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="8位单通道"/>
+
+        <RadioButton
+            android:id="@+id/audio_8_d"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="8位双通道"/>
+
+        <RadioButton
+            android:id="@+id/audio_16_s"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="16位单通道"/>
+
+        <RadioButton
+            android:id="@+id/audio_16_d"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="16位双通道"/>
+    </RadioGroup>
+
+    <Button
+        android:id="@+id/audio_play_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="播放"/>
+
+    <Button
+        android:id="@+id/audio_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="按住录音"/>
+
+</LinearLayout>

@@ -5,20 +5,31 @@
                 android:background="#000">
 
     <SurfaceView
-        android:id="@+id/surface_view"
+        android:id="@+id/camera_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_centerInParent="true"/>
 
     <ImageView
-        android:id="@+id/img"
+        android:id="@+id/camera_img"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="#8800"
         android:scaleType="center"/>
 
+    <CheckBox
+        android:id="@+id/camera_check"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="5dp"
+        android:background="#80cccccc"
+        android:checked="true"
+        android:padding="5dp"
+        android:text="使用Camera2"/>
+
     <Button
-        android:id="@+id/next"
+        android:id="@+id/camera_next"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentRight="true"

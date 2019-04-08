@@ -49,7 +49,7 @@ public class VideoActivity extends BaseActivity implements SurfaceHolder.Callbac
             }
         });
 
-        SurfaceView surfaceView = findViewById(R.id.surface_view);
+        SurfaceView surfaceView = findViewById(R.id.camera_surface);
         surfaceHolder = surfaceView.getHolder();
         surfaceHolder.addCallback(this);
     }

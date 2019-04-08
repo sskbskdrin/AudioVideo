@@ -1,20 +1,13 @@
 package cn.sskbskdrin.record.opengl
 
-import android.annotation.TargetApi
 import android.app.Activity
-import android.graphics.SurfaceTexture
-import android.hardware.camera2.CameraManager
-import android.hardware.camera2.params.StreamConfigurationMap
 import android.opengl.GLSurfaceView
 import android.os.Bundle
-import android.util.Size
-import android.view.Surface
-import android.view.SurfaceHolder
 import cn.sskbskdrin.log.L
 import cn.sskbskdrin.log.logcat.LogcatPrinter
 import cn.sskbskdrin.log.logcat.PrettyFormat
-import cn.sskbskdrin.record.camera.Camera2Manager
 import cn.sskbskdrin.record.R
+import cn.sskbskdrin.record.camera.Camera2Manager
 import cn.sskbskdrin.record.mesh.Cube
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -23,7 +16,6 @@ class OpenGlActivity : Activity(), GLSurfaceView.Renderer {
 
     private val TAG = "OpenGlActivity"
 
-    private val manager = Camera2Manager(this)
     private val glView by lazy { findViewById<GLView>(R.id.main_gl_surface) }
 
     private val mesh = Cube(0f, 0f, 0f)
@@ -85,38 +77,6 @@ class OpenGlActivity : Activity(), GLSurfaceView.Renderer {
 //        mesh.setVertices(vertices)
 //        mesh.setIndices(indices)
 //        mesh.setColors(colors)
-    }
-
-    @TargetApi(21)
-    private val listener = object : Camera2Manager.CameraListener {
-
-        override fun getCameraId(manager: CameraManager): String? {
-            return null
-        }
-
-        override fun getPreviewSize(map: StreamConfigurationMap): Size {
-            val sizes = map.getOutputSizes(SurfaceHolder::class.java)
-            L.append("preview size=")
-            for (size in sizes) {
-                L.append("$size ")
-            }
-            L.i(TAG, "")
-            return Size(1280, 720)
-        }
-
-        override fun getVideoSize(map: StreamConfigurationMap): Size {
-            return Size(1280, 720)
-        }
-
-        override fun getSurfaceList(list: ArrayList<Surface>) {
-            val texture = SurfaceTexture(2)
-            texture.setOnFrameAvailableListener {
-                L.d(TAG, "texture on Frame")
-            }
-//            texture.setDefaultBufferSize(1280,720)
-            list.add(Surface(texture))
-            list.add(glView.holder.surface)
-        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

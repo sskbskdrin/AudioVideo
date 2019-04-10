@@ -7,6 +7,8 @@ import android.os.HandlerThread;
 import android.os.Message;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import android.view.ViewGroup;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -108,6 +110,41 @@ public abstract class BaseCamera {
                 }
             }
         }
+    }
+
+    public void fixSurfaceView(SurfaceView view) {
+        Point maxPoint = new Point(view.getMeasuredWidth(), view.getMeasuredHeight());
+        Point p = findBestSurfacePoint(mPreviewSize, maxPoint);
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        if (params != null) {
+            params.width = p.x;
+            params.height = p.y;
+            view.setLayoutParams(params);
+        }
+    }
+
+    private static Point findBestSurfacePoint(Point cameraResolution, Point maxPoint) {
+        if (cameraResolution == null || maxPoint == null || maxPoint.x == 0 || maxPoint.y == 0) {
+            return maxPoint;
+        }
+        double scaleX, scaleY, scale;
+        if (maxPoint.x < maxPoint.y) {
+            scaleX = cameraResolution.x * 1.0f / maxPoint.y;
+            scaleY = cameraResolution.y * 1.0f / maxPoint.x;
+        } else {
+            scaleX = cameraResolution.x * 1.0f / maxPoint.x;
+            scaleY = cameraResolution.y * 1.0f / maxPoint.y;
+        }
+        scale = scaleX > scaleY ? scaleX : scaleY;
+        Point result = new Point();
+        if (maxPoint.x < maxPoint.y) {
+            result.x = (int) (cameraResolution.y / scale);
+            result.y = (int) (cameraResolution.x / scale);
+        } else {
+            result.x = (int) (cameraResolution.x / scale);
+            result.y = (int) (cameraResolution.y / scale);
+        }
+        return result;
     }
 
     public enum CameraID {

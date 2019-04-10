@@ -10,18 +10,21 @@ import android.os.Bundle;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.CheckBox;
 import android.widget.ImageView;
 
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import cn.sskbskdrin.base.BaseActivity;
 import cn.sskbskdrin.log.L;
-import cn.sskbskdrin.record.NativeUtils;
 import cn.sskbskdrin.record.R;
+import cn.sskbskdrin.record.YUVLib;
 
 public class CameraActivity extends BaseActivity implements SurfaceHolder.Callback, BaseCamera.CameraListener {
     private static final String TAG = "MainActivity";
@@ -39,7 +42,7 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_camera);
 
@@ -65,6 +68,9 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
 
     @Override
     public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
+        if (camera != null) {
+            camera.fixSurfaceView(surfaceView);
+        }
     }
 
     @Override
@@ -102,6 +108,8 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
 
     @Override
     public void getSurfaceList(ArrayList<Surface> list) {
+        HashMap<String,Object> map = new HashMap<>();
+        map.remove("adb");
     }
 
     @Override
@@ -146,30 +154,30 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
 
         @Override
         protected Bitmap doInBackground(byte[]... bytes) {
-            long start = System.currentTimeMillis();
-            int[] pixels;
-            byte[] temp = bytes[0];
-            System.out.println("byte length=" + temp.length);
-            //            temp = NativeUtils.nativeRotateNV(temp, width, height, 270);
-            temp = rotate(temp, 90);
-            //            pixels = NativeUtils.NV21toARGB(temp, height, width);
-            //            pixels = NativeUtils.nativeNV21toARGB(temp, width, height);
-            pixels = NativeUtils.YV12toARGB(temp, width, height);
-            System.out.println("temp length=" + temp.length);
-            System.out.println("switch time=" + (System.currentTimeMillis() - start));
+            byte[] src = bytes[0];
+            Bitmap bitmap;
+            System.out.println("data length=" + src.length);
+            byte[] dest = new byte[width * height * 4];
 
-            return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.RGB_565);
-            //            return BitmapFactory.decodeByteArray(temp, 0, temp.length);
+            rotate(src, dest, YUVLib.Format.YV12, 90);
+
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
+            return bitmap;
         }
 
-        private byte[] rotate(byte[] bytes, int degree) {
+        private void rotate(byte[] src, byte[] dest, YUVLib.Format format, int degree) {
+            //            YUVLib.toArgb(src, dest, width, height, format, degree);
+            //            YUVLib.toAbgr(src, dest, width, height, format, degree);
+            YUVLib.toRGBA(src, dest, width, height, format, degree);
+            //            YUV.toArgb(src, dest, width, height, format, degree);
+
             int w = width;
             int h = height;
             if (degree % 180 != 0) {
                 width = h;
                 height = w;
             }
-            return NativeUtils.rotateYV(bytes, w, h, degree);
         }
 
         @Override

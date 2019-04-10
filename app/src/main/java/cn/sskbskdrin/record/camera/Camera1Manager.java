@@ -23,7 +23,6 @@ public class Camera1Manager extends BaseCamera implements Camera.PreviewCallback
     boolean isPortrait = true;
     private Camera camera;
 
-    private Point surfacePoint;
     private boolean initialized;
     private boolean previewing;
 
@@ -93,7 +92,6 @@ public class Camera1Manager extends BaseCamera implements Camera.PreviewCallback
             int width = holder.getSurfaceFrame().width();
             int height = holder.getSurfaceFrame().height();
             Point temp = new Point(width, height);
-            surfacePoint = findBestSurfacePoint(mPreviewSize, temp);
         }
 
         String parametersFlattened = parameters.flatten(); // Save
@@ -187,10 +185,6 @@ public class Camera1Manager extends BaseCamera implements Camera.PreviewCallback
         previewing = false;
     }
 
-    public Point getSurfacePoint() {
-        return surfacePoint;
-    }
-
     private void setDesiredCameraParameters(Camera camera, boolean safeMode) {
         Camera.Parameters parameters = camera.getParameters();
         if (parameters == null) {
@@ -214,30 +208,6 @@ public class Camera1Manager extends BaseCamera implements Camera.PreviewCallback
             mPreviewSize.x = afterSize.width;
             mPreviewSize.y = afterSize.height;
         }
-    }
-
-    private static Point findBestSurfacePoint(Point cameraResolution, Point maxPoint) {
-        if (cameraResolution == null || maxPoint == null || maxPoint.x == 0 || maxPoint.y == 0) {
-            return maxPoint;
-        }
-        double scaleX, scaleY, scale;
-        if (maxPoint.x < maxPoint.y) {
-            scaleX = cameraResolution.x * 1.0f / maxPoint.y;
-            scaleY = cameraResolution.y * 1.0f / maxPoint.x;
-        } else {
-            scaleX = cameraResolution.x * 1.0f / maxPoint.x;
-            scaleY = cameraResolution.y * 1.0f / maxPoint.y;
-        }
-        scale = scaleX > scaleY ? scaleX : scaleY;
-        Point result = new Point();
-        if (maxPoint.x < maxPoint.y) {
-            result.x = (int) (cameraResolution.y / scale);
-            result.y = (int) (cameraResolution.x / scale);
-        } else {
-            result.x = (int) (cameraResolution.x / scale);
-            result.y = (int) (cameraResolution.y / scale);
-        }
-        return result;
     }
 
     @Override

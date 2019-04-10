@@ -6,11 +6,11 @@ import android.util.Log;
  * @author sskbskdrin
  * @date 2019/March/29
  */
-public class NativeUtils {
-    private static final String TAG = "NativeUtils";
+public class YUV {
+    private static final String TAG = "YUV";
 
     static {
-        System.loadLibrary("native-lib");
+        System.loadLibrary("my-yuv");
     }
 
     private static int color(byte Y, byte U, byte V) {
@@ -283,12 +283,16 @@ public class NativeUtils {
         return bytes;
     }
 
-    public static native int[] nativeNV21toARGB(byte[] bytes, int width, int height);
+    public static void toArgb(byte[] src, byte[] dest, int width, int height, YUVLib.Format format, int rotate) {
+        long start = System.currentTimeMillis();
 
-    public static native int[] nativeNV12toARGB(byte[] bytes, int width, int height);
+        nativeToArgb(src, dest, width, height, format.value, rotate);
 
-    public static native int[] nativeYV12toARGB(byte[] bytes, int width, int height);
+        Log.d(TAG, "toArgb: time=" + (System.currentTimeMillis() - start));
+    }
 
     public static native byte[] nativeRotateNV(byte[] bytes, int width, int height, int degree);
+
+    private static native void nativeToArgb(byte[] src, byte[] dest, int width, int height, int format, int rotate);
 
 }

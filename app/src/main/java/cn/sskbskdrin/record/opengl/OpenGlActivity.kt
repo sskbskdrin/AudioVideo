@@ -7,7 +7,6 @@ import cn.sskbskdrin.log.L
 import cn.sskbskdrin.log.logcat.LogcatPrinter
 import cn.sskbskdrin.log.logcat.PrettyFormat
 import cn.sskbskdrin.record.R
-import cn.sskbskdrin.record.camera.Camera2Manager
 import cn.sskbskdrin.record.mesh.Cube
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10

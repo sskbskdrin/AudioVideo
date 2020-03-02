@@ -2,6 +2,7 @@ package cn.sskbskdrin.record.video;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
+import android.view.Surface;
 
 import java.nio.ByteBuffer;
 
@@ -18,15 +19,20 @@ public class VideoRecord {
 
     private static final int SIMPLE_RATE = 16000;
 
-
     private int width;
     private int height;
 
-    MuxerThread mMuxerThread;
-    VideoEncoder videoEncoder;
-    AudioEncoder audioEncoder;
+    private MuxerThread mMuxerThread;
+    private VideoEncoder videoEncoder;
+    //    private  AudioEncoder audioEncoder;
 
     private static VideoRecord mInstance;
+    private static boolean mUseSurface;
+
+    public static boolean startRecord(int width, int height, boolean useSurface) {
+        mUseSurface = useSurface;
+        return startRecord(width, height);
+    }
 
     public static boolean startRecord(int width, int height) {
         if (mInstance == null) {
@@ -48,8 +54,8 @@ public class VideoRecord {
                 mInstance.videoEncoder.exit();
                 mInstance.videoEncoder.join();
 
-                mInstance.audioEncoder.exit();
-                mInstance.audioEncoder.join();
+                //                mInstance.audioEncoder.exit();
+                //                mInstance.audioEncoder.join();
 
                 mInstance.mMuxerThread.exit();
                 mInstance.mMuxerThread.join();
@@ -57,7 +63,7 @@ public class VideoRecord {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
+            mUseSurface = false;
             mInstance = null;
         }
     }
@@ -75,8 +81,8 @@ public class VideoRecord {
         this.height = height;
     }
 
-    boolean audio = false;
-    boolean video;
+    private boolean audio = true;
+    private boolean video;
 
     private void start() {
         mMuxerThread = new MuxerThread();
@@ -85,29 +91,34 @@ public class VideoRecord {
             if (track == videoEncoder) {
                 video = true;
             }
-            if (track == audioEncoder) {
-                audio = true;
-            }
+            //            if (track == audioEncoder) {
+            //                audio = true;
+            //            }
             if (audio && video) {
                 mMuxerThread.begin();
             }
         });
 
         videoEncoder = new VideoEncoder(width, height, FRAME_RATE, COMPRESS_RATIO, mMuxerThread);
+        videoEncoder.setInputSurface(mUseSurface);
         videoEncoder.prepare();
         videoEncoder.start();
 
-        audioEncoder = new AudioEncoder(SIMPLE_RATE, mMuxerThread);
-        audioEncoder.prepare();
-        audioEncoder.start();
+        //        audioEncoder = new AudioEncoder(SIMPLE_RATE, mMuxerThread);
+        //        audioEncoder.prepare();
+        //        audioEncoder.start();
+    }
+
+    public static Surface getVideoSurface() {
+        return mInstance.videoEncoder.getSurface();
     }
 
     public interface Muxer extends Status {
         void begin();
 
-        void addData(int trackIndex, ByteBuffer buffer, MediaCodec.BufferInfo info);
+        void addData(Track track, ByteBuffer buffer, MediaCodec.BufferInfo info);
 
-        int addTrack(Track track, MediaFormat mediaFormat);
+        void addTrack(Track track, MediaFormat mediaFormat);
     }
 
     public interface Track extends Status {
@@ -124,33 +135,4 @@ public class VideoRecord {
         void exit();
     }
 
-    public static void main(String[] args) {
-        TTT t = new TTT();
-        t.start();
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        t.getName();
-        try {
-            t.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        System.out.println("main end");
-    }
-
-    static class TTT extends Thread {
-        @Override
-        public void run() {
-            System.out.println("TTT start");
-            try {
-                sleep(3000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            System.out.println("ttt end");
-        }
-    }
 }

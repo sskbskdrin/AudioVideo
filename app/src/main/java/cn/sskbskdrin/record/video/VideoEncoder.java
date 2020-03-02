@@ -5,6 +5,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.util.Log;
+import android.view.Surface;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -20,7 +21,7 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
 
     private static final int TIMEOUT_US = 10000; // 编码超时时间us
     private static final String MIME_TYPE = "video/avc"; // H.264 Advanced Video
-    private static final int I_FRAME_INTERVAL = 10; // I帧间隔（GOP）
+    private static final int I_FRAME_INTERVAL = 1; // I帧间隔（GOP）以秒为单位
 
     private int bitRate;
     private int frameRate;
@@ -31,14 +32,15 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
     private MediaCodec mMediaCodec;  // Android硬编解码器
     private MediaCodec.BufferInfo mBufferInfo; //  编解码Buffer相关信息
 
-    private int mTrackIndex = -1;
-
     private boolean isReady;
     private volatile boolean isRunning;
 
     private WeakReference<VideoRecord.Muxer> mediaMuxer; // 音视频混合器
 
     private ArrayBlockingQueue<byte[]> queue;
+    private Surface surface;
+
+    private boolean useSurface;
 
     public VideoEncoder(int width, int height, int frameRate, int compressRatio, VideoRecord.Muxer muxer) {
         mWidth = width;
@@ -56,13 +58,29 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
                 continue;
             }
             String[] types = codecInfo.getSupportedTypes();
-            for (int j = 0; j < types.length; j++) {
-                if (types[j].equalsIgnoreCase(mimeType)) {
+            for (String type : types) {
+                if (type.equalsIgnoreCase(mimeType)) {
                     return codecInfo;
                 }
             }
         }
         return null;
+    }
+
+    /**
+     * 在{@link VideoEncoder#prepare()}之前调用
+     *
+     * @param use 是否使用surface做输入
+     */
+    public void setInputSurface(boolean use) {
+        useSurface = use;
+    }
+
+    /**
+     * 使用surface做输入时，调用{@link VideoEncoder#prepare()}后会创建
+     */
+    public Surface getSurface() {
+        return surface;
     }
 
     @Override
@@ -72,11 +90,14 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
         mBufferInfo = new MediaCodec.BufferInfo();
         queue = new ArrayBlockingQueue<>(10);
 
-        MediaFormat mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, this.mHeight, this.mWidth);
+        MediaFormat mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, this.mWidth, this.mHeight);
         mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitRate);
         mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate);
         mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
-            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+        if (useSurface) {
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+        }
         mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, I_FRAME_INTERVAL);
         MediaCodecInfo mCodecInfo = selectCodec(MIME_TYPE);
         if (mCodecInfo == null) {
@@ -89,6 +110,9 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
             e.printStackTrace();
         }
         mMediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        if (useSurface) {
+            surface = mMediaCodec.createInputSurface();
+        }
         mMediaCodec.start();
         isReady = true;
         Log.d(TAG, "视频编码器准备完成");
@@ -104,6 +128,14 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
         return isRunning;
     }
 
+    /**
+     * 必须YUV420sp，NV12格式
+     * width=4,height=2;
+     * YYYY
+     * YYYY
+     * UV
+     * UV
+     */
     public void addVideoData(byte[] data) {
         if (queue != null && isReady) {
             if (queue.size() >= 10) {
@@ -118,14 +150,18 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
         Log.d(TAG, "视频编码器启动");
         isRunning = true;
         while (isRunning) {
-            try {
-                byte[] data = queue.take();
-                if (data.length <= 0) {
-                    break;
+            if (useSurface) {
+                output();
+            } else {
+                try {
+                    byte[] data = queue.take();
+                    if (data.length <= 0) {
+                        break;
+                    }
+                    encodeFrame(data);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-                encodeFrame(data);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             }
         }
         readyStop();
@@ -148,11 +184,7 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
      * @param input 每一帧的数据
      */
     private void encodeFrame(byte[] input) {
-        input = rotate270(input, mWidth, mHeight);
-        NV21toNV12(input, mHeight, mWidth);
-
         ByteBuffer[] inputBuffers = mMediaCodec.getInputBuffers();
-        ByteBuffer[] outputBuffers = mMediaCodec.getOutputBuffers();
 
         int inputBufferIndex = mMediaCodec.dequeueInputBuffer(TIMEOUT_US);
         if (inputBufferIndex >= 0) {
@@ -163,6 +195,12 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
         } else {
             Log.e(TAG, "input buffer not available");
         }
+
+        output();
+    }
+
+    private void output() {
+        ByteBuffer[] outputBuffers = mMediaCodec.getOutputBuffers();
         int outputBufferIndex;
         do {
             outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, TIMEOUT_US);
@@ -174,7 +212,7 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
                 VideoRecord.Muxer muxer = mediaMuxer.get();
                 if (muxer != null && muxer.isReady()) {
                     Log.d(TAG, "添加视频轨 INFO_OUTPUT_FORMAT_CHANGED ");
-                    mTrackIndex = muxer.addTrack(this, mMediaCodec.getOutputFormat());
+                    muxer.addTrack(this, mMediaCodec.getOutputFormat());
                 }
             } else if (outputBufferIndex < 0) {
                 Log.e(TAG, "outputBufferIndex < 0");
@@ -193,12 +231,10 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
                         if (muxer.running()) {
                             outputBuffer.position(mBufferInfo.offset);
                             outputBuffer.limit(mBufferInfo.offset + mBufferInfo.size);
-                            muxer.addData(mTrackIndex, outputBuffer, mBufferInfo);
+                            muxer.addData(this, outputBuffer, mBufferInfo);
                             Log.d(TAG, "发送视频帧数据 " + mBufferInfo.size);
                         } else {
-                            if (mTrackIndex < 0) {
-                                mTrackIndex = muxer.addTrack(this, mMediaCodec.getOutputFormat());
-                            }
+                            muxer.addTrack(this, mMediaCodec.getOutputFormat());
                         }
                     }
                 }
@@ -210,37 +246,9 @@ public class VideoEncoder extends Thread implements VideoRecord.Track {
     @Override
     public void exit() {
         Log.w(TAG, "视频exit()");
-        //        addVideoData(new byte[0]);
+        addVideoData(new byte[0]);
         isReady = false;
         isRunning = false;
-    }
-
-    private static void NV21toNV12(byte[] data, int width, int height) {
-        byte temp;
-        for (int i = width * height; i < data.length; i += 2) {
-            temp = data[i];
-            data[i] = data[i + 1];
-            data[i + 1] = temp;
-        }
-    }
-
-    private static byte[] rotate270(byte[] data, int width, int height) {
-        int size = width * height;
-        byte[] temp = new byte[data.length];
-        int index = 0;
-        for (int i = 0; i < width; i++) {
-            for (int j = height - 1; j >= 0; j--) {
-                temp[index++] = data[j * width + i];
-            }
-        }
-
-        for (int i = 0; i < width; i += 2) {
-            for (int j = height / 2 - 1; j >= 0; j--) {
-                temp[index++] = data[size + j * width + i];
-                temp[index++] = data[size + j * width + i + 1];
-            }
-        }
-        return temp;
     }
 
 }

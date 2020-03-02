@@ -190,11 +190,13 @@ public class Camera2Manager extends BaseCamera {
             }
 
             mCameraDevice.createCaptureSession(list, new CameraCaptureSession.StateCallback() {
+                @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     mPreviewSession = session;
                     updatePreview(mPreviewBuilder);
                 }
 
+                @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {}
             }, mBackgroundHandler);
         } catch (CameraAccessException e) {

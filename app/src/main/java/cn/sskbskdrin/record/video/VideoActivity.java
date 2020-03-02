@@ -2,33 +2,47 @@ package cn.sskbskdrin.record.video;
 
 import android.Manifest;
 import android.graphics.ImageFormat;
-import android.hardware.Camera;
+import android.graphics.Point;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.TextView;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import cn.sskbskdrin.base.BaseActivity;
+import cn.sskbskdrin.log.L;
 import cn.sskbskdrin.record.R;
+import cn.sskbskdrin.record.YUV;
+import cn.sskbskdrin.record.camera.BaseCamera;
+import cn.sskbskdrin.record.camera.Camera1Manager;
+import cn.sskbskdrin.record.camera.manager.CameraConfigurationUtils;
 
 /**
  * 音视频混合界面
  *
  * @author sskbskdrin
  */
-public class VideoActivity extends BaseActivity implements SurfaceHolder.Callback, Camera.PreviewCallback {
+public class VideoActivity extends BaseActivity implements SurfaceHolder.Callback, BaseCamera.CameraListener {
+    private static final String TAG = "VideoActivity";
 
-    Camera camera;
+    Camera1Manager camera;
     SurfaceHolder surfaceHolder;
-    int width = 1920;
-    int height = 1080;
+    int width = 1080;
+    int height = 1920;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
         setContentView(R.layout.activity_media_muxer);
 
@@ -74,17 +88,10 @@ public class VideoActivity extends BaseActivity implements SurfaceHolder.Callbac
         stopCamera();
     }
 
-    @Override
-    public void onPreviewFrame(byte[] bytes, Camera camera) {
-        if (isStart) {
-            VideoRecord.addVideoDate(bytes);
-        }
-    }
-
     boolean isStart = false;
 
     void start() {
-        VideoRecord.startRecord(width, height);
+        VideoRecord.startRecord(1080, 1920);
     }
 
     void stop() {
@@ -94,23 +101,12 @@ public class VideoActivity extends BaseActivity implements SurfaceHolder.Callbac
     //----------------------- 摄像头操作相关 --------------------------------------
 
     private void startCamera() {
-        camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_BACK);
-        camera.setDisplayOrientation(90);
-        Camera.Parameters parameters = camera.getParameters();
-        parameters.setPreviewFormat(ImageFormat.NV21);
-        parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
-        parameters.setRotation(180);
-
-        // 这个宽高的设置必须和后面编解码的设置一样，否则不能正常处理
-        parameters.setPreviewSize(width, height);
-
-        try {
-            camera.setParameters(parameters);
-            camera.setPreviewDisplay(surfaceHolder);
-            camera.setPreviewCallback(VideoActivity.this);
-            camera.startPreview();
-        } catch (IOException e) {
-            e.printStackTrace();
+        camera = new Camera1Manager(this);
+        camera.setFrameCallback(true);
+        camera.setPreviewFormat(ImageFormat.NV21);
+        camera.open();
+        if (!thread.isAlive()) {
+            thread.start();
         }
     }
 
@@ -119,11 +115,60 @@ public class VideoActivity extends BaseActivity implements SurfaceHolder.Callbac
      */
     private void stopCamera() {
         if (camera != null) {
-            camera.setPreviewCallback(null);
-            camera.stopPreview();
+            camera.close();
             camera = null;
         }
     }
 
+
+    @Override
+    public void getSurfaceList(ArrayList<Surface> list) {
+
+    }
+
+    @Override
+    public SurfaceHolder getSurfaceHolder() {
+        return surfaceHolder;
+    }
+
+    @Override
+    public Point getPreviewSize(List<Point> list) {
+        L.append("support preview=");
+        for (Point p : list) {
+            L.append(p.x + "x" + p.y + ",");
+        }
+        L.i(TAG, "");
+        findViewById(R.id.camera_surface).post(() -> surfaceHolder.setFixedSize(1920, 1080));
+        return new Point(1920, 1080);
+    }
+
+    @Override
+    public BaseCamera.CameraID getCameraId() {
+        return null;
+    }
+
+    @Override
+    public void onPreviewFrame(final byte[] data) {
+        if (isStart) {
+            if (complate && sHandler != null) {
+                complate = false;
+                sHandler.post(() -> {
+                    byte[] temp = YUV.rotateNV(data, height, width, 90);
+                    temp = YUV.NV21toNV12(temp, width, height);
+                    VideoRecord.addVideoDate(temp);
+                    complate = true;
+                });
+            }
+        }
+    }
+
+    Handler sHandler = null;
+    boolean complate = true;
+    HandlerThread thread = new HandlerThread("decode frame") {
+        @Override
+        protected void onLooperPrepared() {
+            sHandler = new Handler(getLooper());
+        }
+    };
 
 }

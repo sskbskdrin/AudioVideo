@@ -20,6 +20,28 @@ import cn.sskbskdrin.record.FileUtils;
 public class MuxerThread extends Thread implements VideoRecord.Muxer {
     private static final String TAG = "MuxerThread";
 
+    private static final VideoRecord.Track END_TRACK = new VideoRecord.Track() {
+        @Override
+        public void prepare() {
+
+        }
+
+        @Override
+        public boolean isReady() {
+            return false;
+        }
+
+        @Override
+        public boolean running() {
+            return false;
+        }
+
+        @Override
+        public void exit() {
+
+        }
+    };
+
     private MediaMuxer mediaMuxer;
 
     private ArrayBlockingQueue<TrackData> queue;
@@ -36,20 +58,23 @@ public class MuxerThread extends Thread implements VideoRecord.Muxer {
     }
 
     @Override
-    public void addData(int trackIndex, ByteBuffer buffer, MediaCodec.BufferInfo info) {
+    public void addData(VideoRecord.Track track, ByteBuffer buffer, MediaCodec.BufferInfo info) {
         if (queue != null && isRunning) {
             if (queue.size() >= 20) {
                 queue.poll();
             }
-            queue.offer(new TrackData(trackIndex, buffer, info));
+            Integer index = mTrackMap.get(track);
+            if (index != null) {
+                queue.offer(new TrackData(index, buffer, info));
+            }
         }
     }
 
     @Override
-    public synchronized int addTrack(VideoRecord.Track track, MediaFormat mediaFormat) {
+    public synchronized void addTrack(VideoRecord.Track track, MediaFormat mediaFormat) {
         Integer index = mTrackMap.get(track);
         if (index != null) {
-            return index;
+            return;
         }
 
         if (mediaMuxer != null) {
@@ -57,7 +82,7 @@ public class MuxerThread extends Thread implements VideoRecord.Muxer {
                 index = mediaMuxer.addTrack(mediaFormat);
             } catch (Exception e) {
                 Log.e(TAG, "addTrack 异常:" + e.toString());
-                return -2;
+                return;
             }
             Log.e(TAG, "添加Track完成 index=" + index);
             mTrackMap.put(track, index);
@@ -66,7 +91,6 @@ public class MuxerThread extends Thread implements VideoRecord.Muxer {
                 callback.onAddTrack(track);
             }
         }
-        return index == null ? -1 : index;
     }
 
     @Override
@@ -74,7 +98,8 @@ public class MuxerThread extends Thread implements VideoRecord.Muxer {
         queue = new ArrayBlockingQueue<>(20);
         queueMap = new SparseArray<>(3);
         mTrackMap = new WeakHashMap<>();
-        String filePath = FileUtils.getNextFile();
+        mTrackMap.put(END_TRACK, -1);
+        String filePath = FileUtils.getRandomFile(".mp4");
         try {
             mediaMuxer = new MediaMuxer(filePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
         } catch (IOException e) {
@@ -138,7 +163,7 @@ public class MuxerThread extends Thread implements VideoRecord.Muxer {
     @Override
     public void exit() {
         Log.w(TAG, "混合器exit()");
-        addData(-1, null, null);
+        addData(END_TRACK, null, null);
         isRunning = false;
         isReady = false;
     }

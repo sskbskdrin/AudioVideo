@@ -49,7 +49,9 @@ Java_cn_sskbskdrin_record_YUVLib_nativeToArgb(JNIEnv *env, jclass type, jbyteArr
     libyuv::Android420ToABGR(y, width, u, src_stride_uv, v, src_stride_uv, src_pixel_stride_uv,
                              needBuff ? buf : reinterpret_cast<uint8_t *>(dest),
                              width * 4, width, height);
-
+    libyuv::ARGBMirror(reinterpret_cast<const uint8_t *>(buf), width * 4, reinterpret_cast<uint8_t *>(dest), width * 4,
+            width, height);
+    memcpy(buf,dest,width*height*4);
     if (needBuff) {
         int w = rotate % 180 == 0 ? width : height;
         libyuv::ARGBRotate(buf, width * 4, reinterpret_cast<uint8_t *>(dest), w * 4,

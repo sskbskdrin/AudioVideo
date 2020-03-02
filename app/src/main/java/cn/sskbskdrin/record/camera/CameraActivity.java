@@ -7,6 +7,7 @@ import android.graphics.Point;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -32,8 +33,8 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
     private SurfaceView surfaceView;
     private SurfaceHolder surfaceHolder;
 
-    private int width = 1280;
-    private int height = 720;
+    private int width = 800;
+    private int height = 600;
     private ImageView imageView;
     private boolean cut = false;
     private boolean isCamera2 = true;
@@ -92,7 +93,7 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
         }
         camera.setCameraListener(this);
         camera.setFrameCallback(true);
-        camera.setPreviewFormat(ImageFormat.YV12);
+        camera.setPreviewFormat(ImageFormat.NV21);
         camera.open();
     }
 
@@ -108,8 +109,6 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
 
     @Override
     public void getSurfaceList(ArrayList<Surface> list) {
-        HashMap<String,Object> map = new HashMap<>();
-        map.remove("adb");
     }
 
     @Override
@@ -130,11 +129,12 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
 
     @Override
     public BaseCamera.CameraID getCameraId() {
-        return null;
+        return BaseCamera.CameraID.CAMERA_FRONT;
     }
 
     @Override
     public void onPreviewFrame(byte[] data) {
+        Log.i(TAG, "onPreviewFrame: ");
         if (cut) {
             new CutImage(imageView, width, height).execute(data);
             cut = false;
@@ -159,7 +159,7 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
             System.out.println("data length=" + src.length);
             byte[] dest = new byte[width * height * 4];
 
-            rotate(src, dest, YUVLib.Format.YV12, 90);
+            rotate(src, dest, YUVLib.Format.NV21, 90);
 
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));

@@ -38,7 +38,7 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-    implementation 'cn.sskbskdrin:log:0.1.3'
+    implementation 'cn.sskbskdrin:log:0.1.4'
     implementation 'cn.sskbskdrin:ssk-base:0.1.0'
     implementation 'com.android.support:support-fragment:28.0.0'
 }

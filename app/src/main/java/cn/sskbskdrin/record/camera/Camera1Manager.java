@@ -1,5 +1,6 @@
 package cn.sskbskdrin.record.camera;
 
+import android.annotation.TargetApi;
 import android.graphics.Point;
 import android.hardware.Camera;
 import android.support.annotation.NonNull;
@@ -97,7 +98,7 @@ public class Camera1Manager extends BaseCamera implements Camera.PreviewCallback
         String parametersFlattened = parameters.flatten(); // Save
         try {
             parameters.setPreviewSize(mPreviewSize.x, mPreviewSize.y);
-            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+//            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
             parameters.setPreviewFormat(mPreviewFormat);
             camera.setPreviewDisplay(holder);
             setDesiredCameraParameters(camera, true);
@@ -109,6 +110,7 @@ public class Camera1Manager extends BaseCamera implements Camera.PreviewCallback
         } catch (RuntimeException re) {
             Log.w(TAG, "Camera rejected parameters. Setting only minimal safe-mode parameters");
             Log.i(TAG, "Resetting to saved camera params: " + parametersFlattened);
+            re.printStackTrace();
             if (parametersFlattened != null) {
                 parameters = camera.getParameters();
                 parameters.unflatten(parametersFlattened);

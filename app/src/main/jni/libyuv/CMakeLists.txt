@@ -4,21 +4,18 @@
 
 PROJECT ( YUV C CXX )	# "C" is required even for C++ projects
 CMAKE_MINIMUM_REQUIRED( VERSION 2.8 )
-OPTION( TEST "Built unit tests" OFF )
+
+message(${PROJECT_SOURCE_DIR})
 
 SET ( ly_base_dir	${PROJECT_SOURCE_DIR} )
 SET ( ly_src_dir	${ly_base_dir}/source )
 SET ( ly_inc_dir	${ly_base_dir}/include )
-SET ( ly_tst_dir	${ly_base_dir}/unit_test )
 SET ( ly_lib_name	yuv )
 SET ( ly_lib_static	${ly_lib_name} )
 SET ( ly_lib_shared	${ly_lib_name}_shared )
 
 FILE ( GLOB_RECURSE	ly_source_files ${ly_src_dir}/*.cc )
 LIST ( SORT			ly_source_files )
-
-FILE ( GLOB_RECURSE	ly_unittest_sources ${ly_tst_dir}/*.cc )
-LIST ( SORT			ly_unittest_sources )
 
 INCLUDE_DIRECTORIES( BEFORE ${ly_inc_dir} )
 

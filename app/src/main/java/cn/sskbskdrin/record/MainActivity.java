@@ -11,6 +11,7 @@ import cn.sskbskdrin.log.logcat.PrettyFormat;
 import cn.sskbskdrin.record.audio.AudioActivity;
 import cn.sskbskdrin.record.camera.CameraActivity;
 import cn.sskbskdrin.record.opengl.OpenGlActivity;
+import cn.sskbskdrin.record.screen.ScreenRecorderActivity;
 import cn.sskbskdrin.record.video.VideoActivity;
 
 public class MainActivity extends BaseActivity implements View.OnClickListener {
@@ -22,11 +23,13 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
         L.addPinter(new LogcatPrinter(new PrettyFormat()));
 
         checkPermission(1001, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE);
+            Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.CAPTURE_SECURE_VIDEO_OUTPUT);
         getView(R.id.main_camera).setOnClickListener(this);
         getView(R.id.main_audio).setOnClickListener(this);
         getView(R.id.main_video).setOnClickListener(this);
         getView(R.id.main_open_gl).setOnClickListener(this);
+        getView(R.id.main_screen).setOnClickListener(this);
     }
 
     @Override
@@ -44,6 +47,9 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                 break;
             case R.id.main_open_gl:
                 clazz = OpenGlActivity.class;
+                break;
+            case R.id.main_screen:
+                clazz = ScreenRecorderActivity.class;
                 break;
             default:
         }

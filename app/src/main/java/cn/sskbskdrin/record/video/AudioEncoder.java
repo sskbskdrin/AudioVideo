@@ -34,7 +34,6 @@ public class AudioEncoder extends Thread implements VideoRecord.Track {
     private int bufferSize;
     private boolean isReady;
     private boolean isRunning;
-    private int mTrackIndex;
 
     private long prevOutputPTSUs;
 
@@ -173,7 +172,7 @@ public class AudioEncoder extends Thread implements VideoRecord.Track {
                 muxer = this.mediaMuxer.get();
                 if (muxer != null) {
                     Log.e(TAG, "添加音轨 INFO_OUTPUT_FORMAT_CHANGED ");
-                    mTrackIndex = muxer.addTrack(this, mMediaCodec.getOutputFormat());
+                    muxer.addTrack(this, mMediaCodec.getOutputFormat());
                 }
             } else if (encoderStatus < 0) {
                 Log.e(TAG, "encoderStatus < 0");
@@ -185,7 +184,7 @@ public class AudioEncoder extends Thread implements VideoRecord.Track {
 
                 if (mBufferInfo.size != 0 && muxer.running()) {
                     mBufferInfo.presentationTimeUs = getPTSUs();
-                    muxer.addData(mTrackIndex, encodedData, mBufferInfo);
+                    muxer.addData(this, encodedData, mBufferInfo);
                     prevOutputPTSUs = mBufferInfo.presentationTimeUs;
                     Log.e(TAG, "发送音频数据 " + mBufferInfo.size);
                 }

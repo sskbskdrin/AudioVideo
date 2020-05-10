@@ -45,6 +45,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".camera.CameraActivity"/>
+        <activity android:name=".camera.MainActivity"/>
         <activity android:name=".audio.AudioActivity"/>
         <activity android:name=".video.VideoActivity"/>
         <activity android:name=".opengl.OpenGlActivity"/>

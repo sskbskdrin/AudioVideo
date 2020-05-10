@@ -1,32 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#000">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F00">
 
     <SurfaceView
         android:id="@+id/camera_surface"
-        android:layout_width="240dp"
-        android:layout_height="320dp"
-        android:layout_centerInParent="true"/>
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_centerInParent="true" />
 
     <ImageView
         android:id="@+id/camera_img"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="#8800"
-        android:scaleType="center"/>
+        android:scaleType="center" />
 
     <CheckBox
         android:id="@+id/camera_check"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
         android:layout_margin="5dp"
         android:background="#80cccccc"
-        android:checked="true"
         android:padding="5dp"
-        android:text="使用Camera2"/>
+        android:text="使用Camera2" />
+
+    <CheckBox
+        android:id="@+id/camera_id"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="45dp"
+        android:layout_marginRight="5dp"
+        android:background="#80cccccc"
+        android:checked="false"
+        android:padding="5dp"
+        android:text="前摄" />
 
     <Button
         android:id="@+id/camera_next"
@@ -34,6 +46,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentRight="true"
         android:layout_alignParentBottom="true"
-        android:text="next"/>
+        android:text="cut" />
+
 
 </RelativeLayout>

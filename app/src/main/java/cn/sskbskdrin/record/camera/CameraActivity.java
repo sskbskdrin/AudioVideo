@@ -19,7 +19,6 @@ import android.widget.ImageView;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 import cn.sskbskdrin.base.BaseActivity;
@@ -169,7 +168,7 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
         private void rotate(byte[] src, byte[] dest, YUVLib.Format format, int degree) {
             //            YUVLib.toArgb(src, dest, width, height, format, degree);
             //            YUVLib.toAbgr(src, dest, width, height, format, degree);
-            YUVLib.toRGBA(src, dest, width, height, format, degree);
+            YUVLib.toABGR(src, dest, width, height, format, degree);
             //            YUV.toArgb(src, dest, width, height, format, degree);
 
             int w = width;

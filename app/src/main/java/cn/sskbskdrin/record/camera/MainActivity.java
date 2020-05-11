@@ -12,7 +12,7 @@ import android.widget.CompoundButton;
 import android.widget.ImageView;
 
 import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
@@ -156,17 +156,21 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             System.out.println("data length=" + src.length);
             byte[] dest = new byte[width * height * 4];
 
-            rotate(src, dest, YUVLib.Format.NV21, 270);
+            rotate(src, dest, YUVLib.Format.NV21, 90);
 
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
+            System.out.println(Arrays.toString(dest));
+            int[] colors = new int[width * height];
+            YUVLib.nativeBGRAToColor(dest, colors, colors.length);
+            bitmap.setPixels(colors, 0, width, 0, 0, width, height);
+            //            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
             return bitmap;
         }
 
         private void rotate(byte[] src, byte[] dest, YUVLib.Format format, int degree) {
             //            YUVLib.toArgb(src, dest, width, height, format, degree);
             //            YUVLib.toAbgr(src, dest, width, height, format, degree);
-            YUVLib.toRGBA(src, dest, width, height, format, degree);
+            YUVLib.toBGRA(src, dest, width, height, format, degree, false);
             //            YUV.toArgb(src, dest, width, height, format, degree);
 
             int w = width;

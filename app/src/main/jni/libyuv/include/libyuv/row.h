@@ -332,7 +332,6 @@ extern "C" {
 #define HAS_ARGBTOUVROW_NEON
 #define HAS_ARGBTOYJROW_NEON
 #define HAS_ARGBTOYROW_NEON
-#define HAS_AYUVTOUVROW_NEON
 #define HAS_AYUVTOVUROW_NEON
 #define HAS_AYUVTOYROW_NEON
 #define HAS_BGRATOUVROW_NEON
@@ -376,7 +375,6 @@ extern "C" {
 #define HAS_SETROW_NEON
 #define HAS_SPLITRGBROW_NEON
 #define HAS_SPLITUVROW_NEON
-#define HAS_UVToVUROW_NEON
 #define HAS_UYVYTOARGBROW_NEON
 #define HAS_UYVYTOUV422ROW_NEON
 #define HAS_UYVYTOUVROW_NEON
@@ -659,7 +657,7 @@ struct YuvConstants {
 #define KYTORGB 192
 #endif
 
-// Conversion matrix for YUV to RGB
+// Conversion matrix for YUVLib to RGB
 extern const struct YuvConstants SIMD_ALIGNED(kYuvI601Constants);  // BT.601
 extern const struct YuvConstants SIMD_ALIGNED(kYuvJPEGConstants);  // JPeg
 extern const struct YuvConstants SIMD_ALIGNED(kYuvH709Constants);  // BT.709
@@ -3372,34 +3370,17 @@ void UYVYToUV422Row_Any_MMI(const uint8_t* src_ptr,
                             uint8_t* dst_u,
                             uint8_t* dst_v,
                             int width);
-void UVToVURow_C(const uint8_t* src_uv, uint8_t* dst_vu, int width);
-void UVToVURow_NEON(const uint8_t* src_uv, uint8_t* dst_vu, int width);
-void UVToVURow_Any_NEON(const uint8_t* src_uv, uint8_t* dst_vu, int width);
+
 void AYUVToYRow_C(const uint8_t* src_ayuv, uint8_t* dst_y, int width);
-void AYUVToUVRow_C(const uint8_t* src_ayuv,
-                   int stride_ayuv,
-                   uint8_t* dst_uv,
-                   int width);
-void AYUVToVURow_C(const uint8_t* src_ayuv,
-                   int stride_ayuv,
+void AYUVToVURow_C(const uint8_t* src_ayuv, int stride_ayuv,
                    uint8_t* dst_vu,
                    int width);
 void AYUVToYRow_NEON(const uint8_t* src_ayuv, uint8_t* dst_y, int width);
-void AYUVToUVRow_NEON(const uint8_t* src_ayuv,
-                      int stride_ayuv,
-                      uint8_t* dst_uv,
-                      int width);
-void AYUVToVURow_NEON(const uint8_t* src_ayuv,
-                      int stride_ayuv,
+void AYUVToVURow_NEON(const uint8_t* src_ayuv, int stride_ayuv,
                       uint8_t* dst_vu,
                       int width);
 void AYUVToYRow_Any_NEON(const uint8_t* src_ayuv, uint8_t* dst_y, int width);
-void AYUVToUVRow_Any_NEON(const uint8_t* src_ayuv,
-                          int stride_ayuv,
-                          uint8_t* dst_uv,
-                          int width);
-void AYUVToVURow_Any_NEON(const uint8_t* src_ayuv,
-                          int stride_ayuv,
+void AYUVToVURow_Any_NEON(const uint8_t* src_ayuv, int stride_ayuv,
                           uint8_t* dst_vu,
                           int width);
 
@@ -4028,6 +4009,7 @@ void FloatDivToByteRow_NEON(const float* src_weights,
                             uint8_t* dst_out,
                             uint8_t* dst_mask,
                             int width);
+
 
 #ifdef __cplusplus
 }  // extern "C"

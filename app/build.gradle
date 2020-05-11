@@ -14,7 +14,9 @@ android {
         versionName "1.0"
         externalNativeBuild {
             cmake {
-                cppFlags ""
+                arguments "-DANDROID_ARM_NEON=TRUE"
+                abiFilters "arm64-v8a", "armeabi-v7a"
+                arguments "-DCMAKE_BUILD_TYPE=Release"
             }
         }
     }

@@ -41,8 +41,10 @@ public class YUVLib {
          * YYYY
          * YYYY
          * YYYY
-         * VVVV
-         * UUUU
+         * VV
+         * VV
+         * UU
+         * UU
          */
         YV12((byte) 'Y', (byte) 'V', (byte) '1', (byte) '2'),
         /**
@@ -50,8 +52,10 @@ public class YUVLib {
          * YYYY
          * YYYY
          * YYYY
-         * UUUU
-         * VVVV
+         * UU
+         * UU
+         * VV
+         * VV
          */
         I420((byte) 'I', (byte) '4', (byte) '2', (byte) '0');
 

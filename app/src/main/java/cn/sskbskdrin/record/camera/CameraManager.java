@@ -341,6 +341,11 @@ public class CameraManager implements Handler.Callback {
         return list.get(0);
     }
 
+    public int getOrientation() {
+        if (mCamera == null) return 0;
+        return mCamera.surfaceOrientation;
+    }
+
     private int getOrientationDegree(int windowDegree) {
         switch (windowDegree) {
             case Surface.ROTATION_0:

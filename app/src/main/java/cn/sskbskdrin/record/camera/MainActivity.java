@@ -12,6 +12,7 @@ import android.widget.CompoundButton;
 import android.widget.ImageView;
 
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -44,7 +45,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         public void onCameraFrame(byte[] inputFrame, int format, int width, int height) {
             if (isCut.get()) {
                 isCut.set(false);
-                new MainActivity.CutImage(imageView, width, height).execute(inputFrame);
+                new MainActivity.CutImage(imageView, width, height, cameraManager.getOrientation()).execute(inputFrame);
             }
         }
 
@@ -142,11 +143,19 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         private WeakReference<ImageView> view;
         private int width;
         private int height;
+        private int mW;
+        private int mH;
+        private int[] clip;
+        private int degree;
 
-        private CutImage(ImageView view, int width, int height) {
+        private CutImage(ImageView view, int width, int height, int degree) {
             this.view = new WeakReference<>(view);
             this.width = width;
             this.height = height;
+            clip = new int[]{0, 0, width, height};
+            this.mW = clip[2];
+            this.mH = clip[3];
+            this.degree = degree;
         }
 
         @Override
@@ -154,31 +163,30 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             byte[] src = bytes[0];
             Bitmap bitmap;
             System.out.println("data length=" + src.length);
-            byte[] dest = new byte[width * height * 4];
 
-            rotate(src, dest, YUVLib.Format.NV21, 90);
+            byte[] dest = rotate(src, width, height, YUVLib.Format.NV21, degree);
 
-            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            bitmap = Bitmap.createBitmap(mW, mH, Bitmap.Config.ARGB_8888);
             System.out.println(Arrays.toString(dest));
-            int[] colors = new int[width * height];
-            YUVLib.nativeBGRAToColor(dest, colors, colors.length);
-            bitmap.setPixels(colors, 0, width, 0, 0, width, height);
-            //            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
+            //            int[] colors = new int[width * height];
+            //            YUVLib.nativeBGRAToColor(dest, colors, colors.length);
+            //            bitmap.setPixels(colors, 0, width, 0, 0, width, height);
+            //[r,g,b,a]
+            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
             return bitmap;
         }
 
-        private void rotate(byte[] src, byte[] dest, YUVLib.Format format, int degree) {
-            //            YUVLib.toArgb(src, dest, width, height, format, degree);
-            //            YUVLib.toAbgr(src, dest, width, height, format, degree);
+        private byte[] rotate(byte[] src, int width, int height, YUVLib.Format format, int degree) {
+            byte[] dest = new byte[mW * mH * 4];
+            //            YUVLib.toBGRA(src, dest, clip, width, height, format, degree, false);
             YUVLib.toBGRA(src, dest, width, height, format, degree, false);
-            //            YUV.toArgb(src, dest, width, height, format, degree);
-
-            int w = width;
-            int h = height;
+            int w = mW;
+            int h = mH;
             if (degree % 180 != 0) {
-                width = h;
-                height = w;
+                                mW = h;
+                                mH = w;
             }
+            return dest;
         }
 
         @Override

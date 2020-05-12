@@ -26,6 +26,7 @@ INCLUDE_DIRECTORIES( BEFORE ${ly_inc_dir} )
 ADD_LIBRARY				( ${ly_lib_shared} SHARED ${ly_source_files} libyuv.cpp )
 SET_TARGET_PROPERTIES	( ${ly_lib_shared} PROPERTIES OUTPUT_NAME "${ly_lib_name}" )
 SET_TARGET_PROPERTIES	( ${ly_lib_shared} PROPERTIES PREFIX "lib" )
+TARGET_LINK_LIBRARIES	( ${ly_lib_shared} log )
 
 # this creates the conversion tool
 #ADD_EXECUTABLE			( yuvconvert ${ly_base_dir}/util/yuvconvert.cc )

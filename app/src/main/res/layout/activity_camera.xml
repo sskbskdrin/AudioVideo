@@ -10,6 +10,11 @@
         android:layout_height="match_parent"
         android:layout_centerInParent="true" />
 
+    <cn.sskbskdrin.record.camera.DrawSurface
+        android:id="@+id/draw_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <ImageView
         android:id="@+id/camera_img"
         android:layout_width="wrap_content"

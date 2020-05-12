@@ -1,7 +1,6 @@
 package cn.sskbskdrin.record.camera;
 
 import android.graphics.Bitmap;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -11,9 +10,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
@@ -26,6 +23,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     private CameraManager cameraManager = new CameraManager();
     private ImageView imageView;
     private SurfaceView view;
+    private DrawSurface drawView;
     AtomicBoolean isCut = new AtomicBoolean(false);
 
     private boolean v2;
@@ -41,12 +39,16 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
 
         }
 
+        int count = 0;
+
         @Override
         public void onCameraFrame(byte[] inputFrame, int format, int width, int height) {
-            if (isCut.get()) {
-                isCut.set(false);
-                new MainActivity.CutImage(imageView, width, height, cameraManager.getOrientation()).execute(inputFrame);
+            //            if (isCut.get()) {
+            //                isCut.set(false);
+            if (++count > 20) {
+                drawView.send(new MainActivity.CutImage(width, height, cameraManager.getOrientation()).deal(inputFrame));
             }
+            //            }
         }
 
         @Override
@@ -63,6 +65,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         cameraManager.init(this, view, false);
         cameraManager.setCameraListener(listener);
         imageView = findViewById(R.id.camera_img);
+        drawView = findViewById(R.id.draw_surface);
 
         ((CheckBox) findViewById(R.id.camera_check)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -139,8 +142,10 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         cameraManager = null;
     }
 
-    private static class CutImage extends AsyncTask<byte[], Integer, Bitmap> {
-        private WeakReference<ImageView> view;
+    private static byte[] dest = {};
+    private static byte[] src = {};
+
+    private class CutImage {
         private int width;
         private int height;
         private int mW;
@@ -148,53 +153,41 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         private int[] clip;
         private int degree;
 
-        private CutImage(ImageView view, int width, int height, int degree) {
-            this.view = new WeakReference<>(view);
+        private CutImage(int width, int height, int degree) {
             this.width = width;
             this.height = height;
-            clip = new int[]{0, 0, width, height};
+            clip = new int[]{250, 250, width, height};
             this.mW = clip[2];
             this.mH = clip[3];
             this.degree = degree;
         }
 
-        @Override
-        protected Bitmap doInBackground(byte[]... bytes) {
-            byte[] src = bytes[0];
-            Bitmap bitmap;
+        protected Bitmap deal(byte[] s) {
+            if (src.length != s.length) {
+                src = new byte[s.length];
+            }
+            if (dest.length != mW * mH * 4) {
+                dest = new byte[mW * mH * 4];
+            }
+
+            System.arraycopy(s, 0, src, 0, s.length);
             System.out.println("data length=" + src.length);
 
-            byte[] dest = rotate(src, width, height, YUVLib.Format.NV21, degree);
-
-            bitmap = Bitmap.createBitmap(mW, mH, Bitmap.Config.ARGB_8888);
-            System.out.println(Arrays.toString(dest));
+            YUVLib.toBGRA(src, dest, width, height, YUVLib.Format.NV21, degree + (front ? 180 : 0), front);
+            int w = mW;
+            int h = mH;
+            if (degree % 180 != 0) {
+                mW = h;
+                mH = w;
+            }
+            Bitmap bitmap = Bitmap.createBitmap(mW, mH, Bitmap.Config.ARGB_8888);
+            //            System.out.println(Arrays.toString(dest));
             //            int[] colors = new int[width * height];
             //            YUVLib.nativeBGRAToColor(dest, colors, colors.length);
             //            bitmap.setPixels(colors, 0, width, 0, 0, width, height);
             //[r,g,b,a]
             bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
             return bitmap;
-        }
-
-        private byte[] rotate(byte[] src, int width, int height, YUVLib.Format format, int degree) {
-            byte[] dest = new byte[mW * mH * 4];
-            //            YUVLib.toBGRA(src, dest, clip, width, height, format, degree, false);
-            YUVLib.toBGRA(src, dest, width, height, format, degree, false);
-            int w = mW;
-            int h = mH;
-            if (degree % 180 != 0) {
-                                mW = h;
-                                mH = w;
-            }
-            return dest;
-        }
-
-        @Override
-        protected void onPostExecute(Bitmap bitmap) {
-            ImageView img = view.get();
-            if (img != null) {
-                img.setImageBitmap(bitmap);
-            }
         }
     }
 }

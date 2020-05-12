@@ -128,19 +128,36 @@ public class YUVLib {
      * @param rotate 旋转角度，0，90，180，270
      * @param mirror 镜像
      */
+    private static byte[] cache = {};
+
     public static void toBGRA(byte[] src, byte[] dest, int[] clip, int width, int height, Format format, int rotate,
                               boolean mirror) {
         long start = System.currentTimeMillis();
-        byte[] cache = new byte[dest.length];
+        if (cache.length != dest.length) {
+            cache = new byte[dest.length];
+            Log.v(TAG, "new cache: ");
+        }
         nativeByteToBGRA(src, dest, cache, clip, width, height, format.value, rotate, mirror);
+        Log.v(TAG, "toArgb: time=" + (System.currentTimeMillis() - start));
+    }
+
+    public static void toBGRA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache, int[] clip, int width
+        , int height, Format format, int rotate, boolean mirror) {
+        long start = System.currentTimeMillis();
+        if (cache.length != dest.length) {
+            cache = new byte[dest.length];
+            Log.v(TAG, "new cache: ");
+        }
+        nativeYUVToBGRA(srcY, srcU, srcV, dest, cache, clip, width, height, format.value, rotate, mirror);
         Log.v(TAG, "toArgb: time=" + (System.currentTimeMillis() - start));
     }
 
     private static native void nativeByteToBGRA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width,
                                                 int height, int format, int rotate, boolean mirror);
 
-    private static native void nativeYUVToBGRA(byte[] srcY, byte[] srcU, byte[] srcV, int width, int height,
-                                               byte[] dest);
+    private static native void nativeYUVToBGRA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache,
+                                               int[] clip, int width, int height, int format, int rotate,
+                                               boolean mirror);
 
     public static native void nativeBGRAToColor(byte[] src, int[] colors, int size);
 

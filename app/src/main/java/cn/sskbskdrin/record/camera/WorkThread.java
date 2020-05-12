@@ -50,6 +50,21 @@ public final class WorkThread {
         }
     }
 
+    public void send(int what) {
+        send(what, null);
+    }
+
+    public void send(int what, Object obj) {
+        send(what, 0, 0, obj);
+    }
+
+    public void send(int what, int arg1, int arg2, Object obj) {
+        if (workHandler != null) {
+            workHandler.removeMessages(what);
+            workHandler.obtainMessage(what, arg1, arg2, obj).sendToTarget();
+        }
+    }
+
     public Handler getHandler() {
         return workHandler;
     }

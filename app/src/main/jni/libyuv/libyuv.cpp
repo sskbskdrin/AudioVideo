@@ -21,87 +21,7 @@ inline void setP(uint8_t *&s, uint8_t *&y, uint8_t *&u, uint8_t *&v, int w, int 
 }
 
 void toRGBA(uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *dest, uint8_t *cache, int *clip, int width, int height, int
-rotate, bool mirror) {
-    libyuv::RotationMode rotationMode = libyuv::RotationMode::kRotate0;
-    rotate = (rotate % 360 + 360) % 360;
-    if (rotate == 90) {
-        rotationMode = libyuv::RotationMode::kRotate90;
-    } else if (rotate == 180) {
-        rotationMode = libyuv::RotationMode::kRotate180;
-    } else if (rotate == 270) {
-        rotationMode = libyuv::RotationMode::kRotate270;
-    } else {
-        rotate = 0;
-    }
-    uint8_t *s = cache;
-    uint8_t *d = dest;
-    if (clip) {
-        if (rotate == 90) {
-            int x = clip[1];
-            clip[1] = height - clip[2] - clip[0];
-            clip[0] = x;
-        }
-        if (rotate == 180) {
-            clip[0] = width - clip[0] - clip[2];
-            clip[1] = height - clip[1] - clip[3];
-        }
-        if (rotate == 270) {
-            int x = clip[0];
-            clip[0] = width - clip[3] - clip[1];
-            clip[1] = x;
-        }
-        LOGD("libyuv", "rotate=%d %d,%d", rotate, clip[0], clip[1]);
-        int w = clip[2];
-        int h = clip[3];
-        if (rotate % 180) {
-            h = clip[2];
-            w = clip[3];
-        }
-
-        uint8_t *dy = d;
-        uint8_t *du = dy + w * h;
-        uint8_t *dv = du + w * h / 4;
-
-        y += clip[0] + clip[1] * width;
-        u += clip[0] / 2 + clip[1] * width / 4;
-        v += clip[0] / 2 + clip[1] * width / 4;
-
-        int uvw = (w + 1) >> 1;
-        libyuv::I420Copy(y, width, u, (width + 1) >> 1, v, (width + 1) >> 1,
-                         dy, w, du, uvw, dv, uvw, w, h);
-        LOGD("libyuv", "I420Copy");
-        width = w;
-        height = h;
-        y = dy;
-        u = du;
-        v = dv;
-        swapP(s, d);
-    }
-
-    //[r,g,b,a]
-//    libyuv::I420ToARGB(y, width, u, width / 2, v, width / 2, d, width * 4, width, height);//NV21 正常
-    libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, d, width * 4, width, height);
-//    libyuv::Android420ToARGB(y, width, u, width / 2, v, width / 2, 1, d, width * 4, width, height);
-    swapP(s, d);
-
-    if (rotate != 0) {
-        int w = rotate % 180 == 0 ? width : height;
-        libyuv::ARGBRotate(s, width * 4, d, w * 4, width, height, rotationMode);
-        height = height == w ? width : height;
-        width = w;
-        swapP(s, d);
-    }
-    if (mirror) {
-        libyuv::ARGBMirror(s, width * 4, d, width * 4, width, height);
-        swapP(s, d);
-    }
-    if (s != dest) {
-        libyuv::CopyPlane(s, width * height * 4, d, width * height * 4, width * height * 4, 1);
-    }
-}
-
-void toRGB(uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *dest, uint8_t *cache, int *clip, int width, int height, int
-rotate, bool mirror) {
+rotate, bool mirror, bool hasAlpha) {
     libyuv::RotationMode rotationMode = libyuv::RotationMode::kRotate0;
     rotate = (rotate % 360 + 360) % 360;
     if (rotate == 90) {
@@ -179,76 +99,24 @@ rotate, bool mirror) {
         setP(d, dy, du, dv, width, height);
     }
 
-    libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, dy, width * 4, width, height);
+    if (hasAlpha) {
+        libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, dy, width * 4, width, height);
+    } else {
+        libyuv::I420ToRGB24(y, width, u, width / 2, v, width / 2, dy, width * 3, width, height);
+    }
 
     if (dy != dest) {
-        libyuv::CopyPlane(dy, width * height * 4, dest, width * height * 4, width * height * 4, 1);
+        int mul = hasAlpha ? 4 : 3;
+        libyuv::CopyPlane(dy, width * height * mul, dest, width * height * mul, width * height * mul, 1);
     }
-
-    LOGD("libyuv", "toRGB");
-}
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nToArgb(JNIEnv *env, jclass type, jbyteArray bytes_, jbyteArray dest_, jint width,
-                                         jint height, jint format, jint rotate) {
-    jbyte *bytes = env->GetByteArrayElements(bytes_, NULL);
-    jbyte *dest = env->GetByteArrayElements(dest_, NULL);
-
-    libyuv::RotationMode rotationMode = libyuv::RotationMode::kRotate0;
-    if (rotate == 90) {
-        rotationMode = libyuv::RotationMode::kRotate90;
-    } else if (rotate == 180) {
-        rotationMode = libyuv::RotationMode::kRotate180;
-    } else if (rotate == 270) {
-        rotationMode = libyuv::RotationMode::kRotate270;
-    }
-    LIBYUV_BOOL needBuff = rotationMode != libyuv::RotationMode::kRotate0;
-    uint8_t *buf = nullptr;
-    if (needBuff) {
-        buf = static_cast<uint8_t *>(malloc(static_cast<size_t>(width * height * 4)));
-    }
-
-    uint8_t *y = reinterpret_cast<uint8_t *>(bytes);
-    uint8_t *v = nullptr;
-    uint8_t *u = nullptr;
-    int src_stride_uv = width;
-    int src_pixel_stride_uv = 2;
-    if (format == libyuv::FOURCC_NV21) {
-        v = y + width * height;
-        u = v + 1;
-    } else if (format == libyuv::FOURCC_NV12) {
-        v = y + width * height + 1;
-        u = v - 1;
-    } else { //YV12
-        src_stride_uv = width / 2;
-        src_pixel_stride_uv = 1;
-        v = y + width * height;
-        u = v + width * height / 4;
-    }
-
-    libyuv::Android420ToABGR(y, width, u, src_stride_uv, v, src_stride_uv, src_pixel_stride_uv,
-                             needBuff ? buf : reinterpret_cast<uint8_t *>(dest),
-                             width * 4, width, height);
-    libyuv::ARGBMirror(reinterpret_cast<const uint8_t *>(buf), width * 4, reinterpret_cast<uint8_t *>(dest), width * 4,
-                       width, height);
-    memcpy(buf, dest, width * height * 4);
-    if (needBuff) {
-        int w = rotate % 180 == 0 ? width : height;
-        libyuv::ARGBRotate(buf, width * 4, reinterpret_cast<uint8_t *>(dest), w * 4,
-                           width, height, rotationMode);
-        free(buf);
-    }
-
-    env->ReleaseByteArrayElements(bytes_, bytes, 0);
-    env->ReleaseByteArrayElements(dest_, dest, 0);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyteArray src_, jbyteArray dest_,
                                                   jbyteArray cache_, jintArray clip_, jint width, jint height,
-                                                  jint format, jint rotate, jboolean m) {
+                                                  jint format, jint rotate, jboolean m,
+                                                  jboolean hasAlpha) {
     if (!src_ || !dest_) {
         return;
     }
@@ -264,7 +132,6 @@ Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyt
     uint8_t *y = src;
     uint8_t *v = nullptr;
     uint8_t *u = nullptr;
-    int src_stride_uv = width;
     int src_pixel_stride_uv = 2;
     if (format == libyuv::FOURCC_NV21) {
         v = y + width * height;
@@ -273,12 +140,10 @@ Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyt
         u = y + width * height;
         v = u + 1;
     } else if (format == libyuv::FOURCC_YV12) { //YV12
-        src_stride_uv = width / 2;
         src_pixel_stride_uv = 1;
         v = y + width * height;
         u = v + width * height / 4;
     } else if (format == libyuv::FOURCC_I420) {
-        src_stride_uv = width / 2;
         src_pixel_stride_uv = 1;
         u = y + width * height;
         v = u + width * height / 4;
@@ -309,7 +174,7 @@ Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyt
         v = sv;
     }
 
-    toRGB(y, u, v, dest, cache, clip, width, height, rotate, m);
+    toRGBA(y, u, v, dest, cache, clip, width, height, rotate, m, hasAlpha);
 
     env->ReleaseByteArrayElements(src_, (jbyte *) src, 0);
     env->ReleaseByteArrayElements(dest_, (jbyte *) dest, 0);
@@ -326,7 +191,8 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_cn_sskbskdrin_record_YUVLib_nativeYUVToRGBA(JNIEnv *env, jclass clazz, jbyteArray src_y, jbyteArray src_u,
                                                  jbyteArray src_v, jbyteArray dest_, jbyteArray cache_, jintArray clip_,
-                                                 jint width, jint height, jint format, jint rotate, jboolean mirror) {
+                                                 jint width, jint height, jint format, jint rotate, jboolean mirror,
+                                                 jboolean hasAlpha) {
     uint8_t *srcY = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_y, NULL));
     uint8_t *srcU = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_u, NULL));
     uint8_t *srcV = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_v, NULL));
@@ -338,7 +204,7 @@ Java_cn_sskbskdrin_record_YUVLib_nativeYUVToRGBA(JNIEnv *env, jclass clazz, jbyt
         clip = env->GetIntArrayElements(clip_, NULL);
     }
 
-    toRGBA(srcY, srcU, srcV, dest, cache, clip, width, height, rotate, mirror);
+    toRGBA(srcY, srcU, srcV, dest, cache, clip, width, height, rotate, mirror, hasAlpha);
 
     env->ReleaseByteArrayElements(src_y, (jbyte *) srcY, 0);
     env->ReleaseByteArrayElements(src_u, (jbyte *) srcU, 0);
@@ -350,6 +216,58 @@ Java_cn_sskbskdrin_record_YUVLib_nativeYUVToRGBA(JNIEnv *env, jclass clazz, jbyt
         env->ReleaseIntArrayElements(clip_, clip, 0);
 }
 
+extern "C"
+JNIEXPORT void JNICALL
+Java_cn_sskbskdrin_record_YUVLib_nativeSplitRGBA(JNIEnv *env, jclass clazz, jbyteArray rgba_, jbyteArray r_,
+                                                 jbyteArray g_, jbyteArray b_, jbyteArray a_, jint size, jboolean
+                                                 has_alpha) {
+    uint8_t *rgba = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(rgba_, NULL));
+    uint8_t *r = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(r_, NULL));
+    uint8_t *g = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(g_, NULL));
+    uint8_t *b = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(b_, NULL));
+    uint8_t *a = nullptr;
+    if (a_) {
+        a = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(a_, NULL));
+    }
+    if (has_alpha) {
+        if (a)
+            libyuv::ARGBExtractAlpha(rgba, size, a, size / 4, size / 4, 1);
+        libyuv::SplitRGBPlane(rgba, 4, r, 1, g, 1, b, 1, 1, size / 4);
+    } else {
+        libyuv::SplitRGBPlane(rgba, size, r, 1, g, 1, b, 1, size / 3, 1);
+        if (a) {
+            libyuv::SetPlane(a, size / 3, size / 3, 1, 255);
+        }
+    }
+
+    env->ReleaseByteArrayElements(rgba_, (jbyte *) rgba, 0);
+    env->ReleaseByteArrayElements(r_, (jbyte *) r, 0);
+    env->ReleaseByteArrayElements(g_, (jbyte *) g, 0);
+    env->ReleaseByteArrayElements(b_, (jbyte *) b, 0);
+    if (a)
+        env->ReleaseByteArrayElements(a_, (jbyte *) a, 0);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_cn_sskbskdrin_record_YUVLib_nativeScaleRGBA(JNIEnv *env, jclass clazz, jbyteArray src_, jint width, jint height,
+                                                 jbyteArray dest_, jint d_width, jint d_height, jint quality) {
+    uint8_t *src = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_, NULL));
+    uint8_t *dest = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(dest_, NULL));
+    libyuv::FilterMode mode;
+    if (quality == 1) {
+        mode = libyuv::FilterMode::kFilterLinear;
+    } else if (quality == 2) {
+        mode = libyuv::FilterMode::kFilterBilinear;
+    } else if (quality == 3) {
+        mode = libyuv::FilterMode::kFilterBox;
+    } else {
+        mode = libyuv::FilterMode::kFilterNone;
+    }
+    libyuv::ARGBScale(src, width * 4, width, height, dest, d_width * 4, d_width, d_height, mode);
+    env->ReleaseByteArrayElements(src_, (jbyte *) src, 0);
+    env->ReleaseByteArrayElements(dest_, (jbyte *) dest, 0);
+}
 extern "C"
 JNIEXPORT void JNICALL
 Java_cn_sskbskdrin_record_YUVLib_nativeBGRAToColor(JNIEnv *env, jclass clazz, jbyteArray src_, jintArray colors_, jint

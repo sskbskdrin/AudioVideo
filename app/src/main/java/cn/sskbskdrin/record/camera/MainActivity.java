@@ -9,6 +9,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
@@ -39,22 +40,16 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
 
         }
 
-        int count = 0;
-
         @Override
         public void onCameraFrame(byte[] bytes, byte[] uBytes, byte[] vBytes, int format, int width, int height,
                                   boolean v2) {
-            //            if (isCut.get()) {
-            //                isCut.set(false);
-            if (++count > 10) {
-                if (v2) {
-                    drawView.send(factory.getBitmap(bytes, uBytes, vBytes, null, width, height,
-                        cameraManager.getOrientation()));
-                } else {
-                    drawView.send(factory.getBitmap(bytes, width, height, format, cameraManager.getOrientation()));
-                }
+            int rotate = cameraManager != null ? cameraManager.getOrientation() : 0;
+            if (v2) {
+                drawView.send(factory.getBitmap(bytes, uBytes, vBytes, new int[]{205, 205, 300, 400}, width, height,
+                    rotate + (front ? 180 : 0), front));
+            } else {
+                drawView.send(factory.getBitmap(bytes, width, height, format, rotate + (front ? 180 : 0), front));
             }
-            //            }
         }
 
         @Override
@@ -98,12 +93,17 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         });
 
         byte[] src = new byte[]{0, 80, (byte) 255, (byte) 255, 0, 80, (byte) 255, (byte) 255, 0, 80, (byte) 255,
-            (byte) 255, 0, 80, (byte) 255, (byte) 255};
-        int[] dest = new int[4];
-        YUVLib.nativeBGRAToColor(src, dest, 16);
-        for (int i = 0; i < dest.length; i++) {
-            Log.d(TAG, "onCreate: " + Integer.toHexString(dest[i]));
-        }
+            (byte) 255, 0, 80, (byte) 255, (byte) 200};
+        src = new byte[]{0, 60, 80, 1, 61, 81, 2, 62, 82, 3, 63, 83};
+        byte[] r = new byte[4];
+        byte[] g = new byte[4];
+        byte[] b = new byte[4];
+        byte[] a = new byte[4];
+        YUVLib.splitRGBA(src, r, g, b, false);
+        Log.d(TAG, "onCreate: r=" + Arrays.toString(r));
+        Log.d(TAG, "onCreate: g=" + Arrays.toString(g));
+        Log.d(TAG, "onCreate: b=" + Arrays.toString(b));
+        Log.d(TAG, "onCreate: a=" + Arrays.toString(a));
     }
 
     private void change() {
@@ -130,7 +130,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     protected void onPause() {
         super.onPause();
         if (cameraManager != null) {
-            cameraManager.setEnabled(false);
+            //            cameraManager.setEnabled(false);
         }
     }
 

@@ -132,7 +132,12 @@ public class YUVLib {
      */
     public static void byteToRGBA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width, int height,
                                   int format, int rotate, boolean mirror) {
-        nativeByteToRGBA(src, dest, cache, clip, width, height, Format.getValue(format), rotate, mirror);
+        nativeByteToRGBA(src, dest, cache, clip, width, height, Format.getValue(format), rotate, mirror, true);
+    }
+
+    public static void byteToRGBA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width, int height,
+                                  int format, int rotate, boolean mirror, boolean hasAlpha) {
+        nativeByteToRGBA(src, dest, cache, clip, width, height, Format.getValue(format), rotate, mirror, hasAlpha);
     }
 
     /**
@@ -152,19 +157,34 @@ public class YUVLib {
      */
     public static void yuvToRGBA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache, int[] clip,
                                  int width, int height, int format, int rotate, boolean mirror) {
-        nativeYUVToRGBA(srcY, srcU, srcV, dest, cache, clip, width, height, Format.getValue(format), rotate, mirror);
+        nativeYUVToRGBA(srcY, srcU, srcV, dest, cache, clip, width, height, Format.getValue(format), rotate, mirror,
+            true);
+    }
+
+    public static void splitRGBA(byte[] rgba, byte[] r, byte[] g, byte[] b, boolean hasAlpha) {
+        splitRGBA(rgba, r, g, b, null, hasAlpha);
+    }
+
+    public static void splitRGBA(byte[] rgba, byte[] r, byte[] g, byte[] b, byte[] a, boolean hasAlpha) {
+        nativeSplitRGBA(rgba, r, g, b, a, rgba.length, hasAlpha);
+    }
+
+    public static void scaleRGBA(byte[] src, int width, int height, byte[] dest, int dWidth, int dHeight, int quality) {
+        nativeScaleRGBA(src, width, height, dest, dWidth, dHeight, quality);
     }
 
     private static native void nativeByteToRGBA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width,
-                                                int height, int format, int rotate, boolean mirror);
+                                                int height, int format, int rotate, boolean mirror, boolean hasAlpha);
 
     private static native void nativeYUVToRGBA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache,
                                                int[] clip, int width, int height, int format, int rotate,
-                                               boolean mirror);
+                                               boolean mirror, boolean hasAlpha);
 
-    private static native void nativeRGBASplit(byte[] rgba, byte[] r, byte[] g, byte[] b);
+    private static native void nativeSplitRGBA(byte[] rgba, byte[] r, byte[] g, byte[] b, byte[] a, int srcSize,
+                                               boolean hasAlpha);
 
     public static native void nativeBGRAToColor(byte[] src, int[] colors, int srcSize);
 
-    private static native void nToArgb(byte[] src, byte[] dest, int width, int height, int format, int rotate);
+    private static native void nativeScaleRGBA(byte[] src, int width, int height, byte[] dest, int dWidth,
+                                               int dHeight, int quality);
 }

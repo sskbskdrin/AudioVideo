@@ -113,7 +113,7 @@ class CameraImpl extends CameraManager.ICamera implements Camera.PreviewCallback
         if (Build.FINGERPRINT.startsWith("generic") || Build.FINGERPRINT.startsWith("unknown") || Build.MODEL.contains("google_sdk") || Build.MODEL.contains("Emulator") || Build.MODEL.contains("Android " + "SDK built for x86") || Build.MANUFACTURER.contains("Genymotion") || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")) || "google_sdk".equals(Build.PRODUCT))
             params.setPreviewFormat(ImageFormat.YV12);  // "generic" or "android" = android emulator
         else params.setPreviewFormat(ImageFormat.NV21);
-        //        params.setPreviewFormat(ImageFormat.YV12);
+                params.setPreviewFormat(ImageFormat.YV12);
         //        params.setPreviewFormat(ImageFormat.NV21);
         List<Integer> supportedPreviewFormats = params.getSupportedPreviewFormats();
         Log.d(TAG, "support format: " + Arrays.toString(supportedPreviewFormats.toArray()));

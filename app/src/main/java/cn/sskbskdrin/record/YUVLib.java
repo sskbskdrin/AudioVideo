@@ -1,6 +1,6 @@
 package cn.sskbskdrin.record;
 
-import android.util.Log;
+import android.graphics.ImageFormat;
 
 /**
  * @author sskbskdrin
@@ -13,7 +13,7 @@ public class YUVLib {
         System.loadLibrary("yuv");
     }
 
-    public enum Format {
+    private enum Format {
 
         /*YUV420sp*/
         /**
@@ -68,8 +68,21 @@ public class YUVLib {
             value |= (d & 0xff) << 24;
         }
 
-        public int getValue() {
-            return value;
+        public static int getValue(int format) {
+            switch (format) {
+                case ImageFormat.NV21:
+                    format = YUVLib.Format.NV21.value;
+                    break;
+                case ImageFormat.YV12:
+                    format = YUVLib.Format.YV12.value;
+                    break;
+                case ImageFormat.YUV_420_888:
+                    format = YUVLib.Format.I420.value;
+                    break;
+                default:
+                    throw new IllegalArgumentException("format " + format + " not support");
+            }
+            return format;
         }
     }
 
@@ -104,62 +117,54 @@ public class YUVLib {
         }
     }
 
-
-    public static void toABGR(byte[] src, byte[] dest, int width, int height, Format format) {
-        toABGR(src, dest, width, height, format, 0);
-    }
-
-    public static void toABGR(byte[] src, byte[] dest, int width, int height, Format format, int rotate) {
-        toBGRA(src, dest, width, height, format, rotate, false);
-    }
-
-    public static void toBGRA(byte[] src, byte[] dest, int width, int height, Format format, int rotate,
-                              boolean mirror) {
-        toBGRA(src, dest, null, width, height, format, rotate, mirror);
+    /**
+     * yuv数组转[r,g,b,a]
+     *
+     * @param src    yuv数据
+     * @param dest   存储结果
+     * @param cache  缓存
+     * @param clip   裁剪区域,旋转后的位置[x,y,w,h]
+     * @param width  yuv数据的宽
+     * @param height yuv数据的高
+     * @param format yuv数据格式
+     * @param rotate 旋转角度[0,90,180,270]
+     * @param mirror 是否镜像
+     */
+    public static void byteToRGBA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width, int height,
+                                  int format, int rotate, boolean mirror) {
+        nativeByteToRGBA(src, dest, cache, clip, width, height, Format.getValue(format), rotate, mirror);
     }
 
     /**
-     * @param src    源数据
-     * @param dest   目标数据
-     * @param clip   目标数据裁剪 [x,y,w,h]
-     * @param width  源数据宽
-     * @param height 源数据高
-     * @param format 源数据格式
-     * @param rotate 旋转角度，0，90，180，270
-     * @param mirror 镜像
+     * yuv数组转[r,g,b,a]
+     *
+     * @param srcY   y数据
+     * @param srcU   u数据
+     * @param srcV   v数据
+     * @param dest   存储结果
+     * @param cache  缓存
+     * @param clip   裁剪区域,旋转后的位置[x,y,w,h]
+     * @param width  yuv数据的宽
+     * @param height yuv数据的高
+     * @param format yuv数据格式
+     * @param rotate 旋转角度[0,90,180,270]
+     * @param mirror 是否镜像
      */
-    private static byte[] cache = {};
-
-    public static void toBGRA(byte[] src, byte[] dest, int[] clip, int width, int height, Format format, int rotate,
-                              boolean mirror) {
-        long start = System.currentTimeMillis();
-        if (cache.length != dest.length) {
-            cache = new byte[dest.length];
-            Log.v(TAG, "new cache: ");
-        }
-        nativeByteToBGRA(src, dest, cache, clip, width, height, format.value, rotate, mirror);
-        Log.v(TAG, "toArgb: time=" + (System.currentTimeMillis() - start));
+    public static void yuvToRGBA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache, int[] clip,
+                                 int width, int height, int format, int rotate, boolean mirror) {
+        nativeYUVToRGBA(srcY, srcU, srcV, dest, cache, clip, width, height, Format.getValue(format), rotate, mirror);
     }
 
-    public static void toBGRA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache, int[] clip, int width
-        , int height, Format format, int rotate, boolean mirror) {
-        long start = System.currentTimeMillis();
-        if (cache.length != dest.length) {
-            cache = new byte[dest.length];
-            Log.v(TAG, "new cache: ");
-        }
-        nativeYUVToBGRA(srcY, srcU, srcV, dest, cache, clip, width, height, format.value, rotate, mirror);
-        Log.v(TAG, "toArgb: time=" + (System.currentTimeMillis() - start));
-    }
-
-    private static native void nativeByteToBGRA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width,
+    private static native void nativeByteToRGBA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width,
                                                 int height, int format, int rotate, boolean mirror);
 
-    private static native void nativeYUVToBGRA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache,
+    private static native void nativeYUVToRGBA(byte[] srcY, byte[] srcU, byte[] srcV, byte[] dest, byte[] cache,
                                                int[] clip, int width, int height, int format, int rotate,
                                                boolean mirror);
 
-    public static native void nativeBGRAToColor(byte[] src, int[] colors, int size);
+    private static native void nativeRGBASplit(byte[] rgba, byte[] r, byte[] g, byte[] b);
+
+    public static native void nativeBGRAToColor(byte[] src, int[] colors, int srcSize);
 
     private static native void nToArgb(byte[] src, byte[] dest, int width, int height, int format, int rotate);
 }

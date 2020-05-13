@@ -158,17 +158,18 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
             System.out.println("data length=" + src.length);
             byte[] dest = new byte[width * height * 4];
 
-            rotate(src, dest, YUVLib.Format.NV21, 90);
+            rotate(src, dest, ImageFormat.NV21, 90);
 
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
             return bitmap;
         }
 
-        private void rotate(byte[] src, byte[] dest, YUVLib.Format format, int degree) {
+        private void rotate(byte[] src, byte[] dest, int format, int degree) {
             //            YUVLib.toArgb(src, dest, width, height, format, degree);
             //            YUVLib.toAbgr(src, dest, width, height, format, degree);
-            YUVLib.toABGR(src, dest, width, height, format, degree);
+            //            YUVLib.toABGR(src, dest, width, height, format, degree);
+            YUVLib.byteToRGBA(src, dest, new byte[dest.length], null, width, height, format, degree, false);
             //            YUV.toArgb(src, dest, width, height, format, degree);
 
             int w = width;

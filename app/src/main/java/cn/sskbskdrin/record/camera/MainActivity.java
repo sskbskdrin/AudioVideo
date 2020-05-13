@@ -1,6 +1,5 @@
 package cn.sskbskdrin.record.camera;
 
-import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -10,11 +9,11 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
 import cn.sskbskdrin.record.R;
+import cn.sskbskdrin.record.YUVFactory;
 import cn.sskbskdrin.record.YUVLib;
 
 public class MainActivity extends BaseActivity implements SurfaceHolder.Callback {
@@ -28,6 +27,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
 
     private boolean v2;
     private boolean front;
+    YUVFactory factory = new YUVFactory();
 
     CameraManager.CameraListener listener = new CameraManager.CameraListener() {
         @Override
@@ -42,11 +42,17 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         int count = 0;
 
         @Override
-        public void onCameraFrame(byte[] inputFrame, int format, int width, int height) {
+        public void onCameraFrame(byte[] bytes, byte[] uBytes, byte[] vBytes, int format, int width, int height,
+                                  boolean v2) {
             //            if (isCut.get()) {
             //                isCut.set(false);
-            if (++count > 20) {
-                drawView.send(new MainActivity.CutImage(width, height, cameraManager.getOrientation()).deal(inputFrame));
+            if (++count > 10) {
+                if (v2) {
+                    drawView.send(factory.getBitmap(bytes, uBytes, vBytes, null, width, height,
+                        cameraManager.getOrientation()));
+                } else {
+                    drawView.send(factory.getBitmap(bytes, width, height, format, cameraManager.getOrientation()));
+                }
             }
             //            }
         }
@@ -62,7 +68,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
         view = findViewById(R.id.camera_surface);
-        cameraManager.init(this, view, false);
+        cameraManager.init(this, view, true);
         cameraManager.setCameraListener(listener);
         imageView = findViewById(R.id.camera_img);
         drawView = findViewById(R.id.draw_surface);
@@ -90,6 +96,14 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
                 isCut.set(true);
             }
         });
+
+        byte[] src = new byte[]{0, 80, (byte) 255, (byte) 255, 0, 80, (byte) 255, (byte) 255, 0, 80, (byte) 255,
+            (byte) 255, 0, 80, (byte) 255, (byte) 255};
+        int[] dest = new int[4];
+        YUVLib.nativeBGRAToColor(src, dest, 16);
+        for (int i = 0; i < dest.length; i++) {
+            Log.d(TAG, "onCreate: " + Integer.toHexString(dest[i]));
+        }
     }
 
     private void change() {
@@ -142,52 +156,4 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         cameraManager = null;
     }
 
-    private static byte[] dest = {};
-    private static byte[] src = {};
-
-    private class CutImage {
-        private int width;
-        private int height;
-        private int mW;
-        private int mH;
-        private int[] clip;
-        private int degree;
-
-        private CutImage(int width, int height, int degree) {
-            this.width = width;
-            this.height = height;
-            clip = new int[]{250, 250, width, height};
-            this.mW = clip[2];
-            this.mH = clip[3];
-            this.degree = degree;
-        }
-
-        protected Bitmap deal(byte[] s) {
-            if (src.length != s.length) {
-                src = new byte[s.length];
-            }
-            if (dest.length != mW * mH * 4) {
-                dest = new byte[mW * mH * 4];
-            }
-
-            System.arraycopy(s, 0, src, 0, s.length);
-            System.out.println("data length=" + src.length);
-
-            YUVLib.toBGRA(src, dest, width, height, YUVLib.Format.NV21, degree + (front ? 180 : 0), front);
-            int w = mW;
-            int h = mH;
-            if (degree % 180 != 0) {
-                mW = h;
-                mH = w;
-            }
-            Bitmap bitmap = Bitmap.createBitmap(mW, mH, Bitmap.Config.ARGB_8888);
-            //            System.out.println(Arrays.toString(dest));
-            //            int[] colors = new int[width * height];
-            //            YUVLib.nativeBGRAToColor(dest, colors, colors.length);
-            //            bitmap.setPixels(colors, 0, width, 0, 0, width, height);
-            //[r,g,b,a]
-            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
-            return bitmap;
-        }
-    }
 }

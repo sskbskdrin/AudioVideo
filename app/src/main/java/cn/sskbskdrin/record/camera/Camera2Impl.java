@@ -90,8 +90,8 @@ public class Camera2Impl extends CameraManager.ICamera {
         Log.d(TAG, "Initialize camera w=" + size.width + " h=" + size.height);
         if (!openCamera()) return false;
         try {
-            android.hardware.camera2.CameraManager manager =
-                (android.hardware.camera2.CameraManager) mContext.get().getSystemService(Context.CAMERA_SERVICE);
+            android.hardware.camera2.CameraManager manager = (android.hardware.camera2.CameraManager) mContext.get()
+                .getSystemService(Context.CAMERA_SERVICE);
 
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraID);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
@@ -145,8 +145,8 @@ public class Camera2Impl extends CameraManager.ICamera {
     }
 
     private boolean openCamera() {
-        android.hardware.camera2.CameraManager manager =
-            (android.hardware.camera2.CameraManager) mContext.get().getSystemService(Context.CAMERA_SERVICE);
+        android.hardware.camera2.CameraManager manager = (android.hardware.camera2.CameraManager) mContext.get()
+            .getSystemService(Context.CAMERA_SERVICE);
         try {
             String[] camList = manager.getCameraIdList();
             if (camList.length == 0) {
@@ -202,7 +202,7 @@ public class Camera2Impl extends CameraManager.ICamera {
                 public void onImageAvailable(ImageReader reader) {
                     Image image = reader.acquireLatestImage();
                     if (image == null) return;
-                    mManager.onPreviewFrame(getBytesFromImage(image, ImageFormat.NV21));
+                    getBytesFromImage(image);
                     image.close();
                 }
             }, mManager.getWorkHandler());
@@ -278,7 +278,7 @@ public class Camera2Impl extends CameraManager.ICamera {
 
     }
 
-    public static byte[] getBytesFromImage(Image image, int format) {
+    private void getBytesFromImage(Image image) {
         //获取源数据，如果是YUV格式的数据planes.length = 3
         //plane[i]里面的实际数据可能存在byte[].length <= capacity (缓冲区总大小)
         final Image.Plane[] planes = image.getPlanes();
@@ -286,16 +286,17 @@ public class Camera2Impl extends CameraManager.ICamera {
         // 所以我们只取width部分
         int width = image.getWidth();
         int height = image.getHeight();
-        Log.d(TAG, "getBytesFromImage: planes len=" + planes.length + " " + width + "x" + height);
+        //        Log.d(TAG, "getBytesFromImage: planes len=" + planes.length + " " + width + "x" + height);
 
         //此处用来装填最终的YUV数据，需要1.5倍的图片大小，因为Y U V 比例为 4:1:1
-        byte[] yuvBytes = new byte[width * height * ImageFormat.getBitsPerPixel(format) / 8];
+        //        byte[] yuvBytes = new byte[width * height * ImageFormat.getBitsPerPixel(format) / 8];
+        byte[] yuvBytes = new byte[width * height];
         //目标数组的装填到的位置
         int dstIndex = 0;
 
         //临时存储uv数据的
-        byte uBytes[] = new byte[width * height / 4];
-        byte vBytes[] = new byte[width * height / 4];
+        byte[] uBytes = new byte[width * height / 4];
+        byte[] vBytes = new byte[width * height / 4];
         int uIndex = 0;
         int vIndex = 0;
 
@@ -310,7 +311,7 @@ public class Camera2Impl extends CameraManager.ICamera {
             //源数据的索引，y的数据是byte中连续的，u的数据是v向左移以为生成的，两者都是偶数位为有效数据
             byte[] bytes = new byte[buffer.capacity()];
             buffer.get(bytes);
-            Log.d(TAG, "getBytesFromImage: " + i + " bytes len=" + bytes.length);
+            //            Log.d(TAG, "getBytesFromImage: " + i + " bytes len=" + bytes.length);
 
             int srcIndex = 0;
             if (i == 0) {
@@ -348,8 +349,12 @@ public class Camera2Impl extends CameraManager.ICamera {
                 }
             }
         }
+        if (mManager != null) {
+            mManager.onPreviewFrame(yuvBytes, uBytes, vBytes);
+        }
 
         //根据要求的结果类型进行填充
+        /*
         switch (format) {
             case ImageFormat.YUV_420_888:
                 System.arraycopy(uBytes, 0, yuvBytes, dstIndex, uBytes.length);
@@ -372,6 +377,6 @@ public class Camera2Impl extends CameraManager.ICamera {
                 }
                 break;
         }
-        return yuvBytes;
+        */
     }
 }

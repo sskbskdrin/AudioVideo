@@ -283,10 +283,10 @@ public class YUV {
         return bytes;
     }
 
-    public static void toArgb(byte[] src, byte[] dest, int width, int height, YUVLib.Format format, int rotate) {
+    public static void toArgb(byte[] src, byte[] dest, int width, int height, int format, int rotate) {
         long start = System.currentTimeMillis();
 
-        nativeToArgb(src, dest, width, height, format.value, rotate);
+        nativeToArgb(src, dest, width, height, format, rotate);
 
         Log.d(TAG, "toArgb: time=" + (System.currentTimeMillis() - start));
     }

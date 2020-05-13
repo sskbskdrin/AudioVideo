@@ -14,8 +14,14 @@ inline void swapP(uint8_t *&a, uint8_t *&b) {
     b = t;
 }
 
+inline void setP(uint8_t *&s, uint8_t *&y, uint8_t *&u, uint8_t *&v, int w, int h) {
+    y = s;
+    u = y + w * h;
+    v = y + w * h * 5 / 4;
+}
+
 void toRGBA(uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *dest, uint8_t *cache, int *clip, int width, int height, int
-rotate, bool m) {
+rotate, bool mirror) {
     libyuv::RotationMode rotationMode = libyuv::RotationMode::kRotate0;
     rotate = (rotate % 360 + 360) % 360;
     if (rotate == 90) {
@@ -73,8 +79,8 @@ rotate, bool m) {
     }
 
     //[r,g,b,a]
-    libyuv::I420ToARGB(y, width, u, width / 2, v, width / 2, d, width * 4, width, height);//NV21 正常
-    //libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, d, width * 4, width, height);
+//    libyuv::I420ToARGB(y, width, u, width / 2, v, width / 2, d, width * 4, width, height);//NV21 正常
+    libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, d, width * 4, width, height);
 //    libyuv::Android420ToARGB(y, width, u, width / 2, v, width / 2, 1, d, width * 4, width, height);
     swapP(s, d);
 
@@ -85,13 +91,101 @@ rotate, bool m) {
         width = w;
         swapP(s, d);
     }
-    if (m) {
+    if (mirror) {
         libyuv::ARGBMirror(s, width * 4, d, width * 4, width, height);
         swapP(s, d);
     }
     if (s != dest) {
         libyuv::CopyPlane(s, width * height * 4, d, width * height * 4, width * height * 4, 1);
     }
+}
+
+void toRGB(uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *dest, uint8_t *cache, int *clip, int width, int height, int
+rotate, bool mirror) {
+    libyuv::RotationMode rotationMode = libyuv::RotationMode::kRotate0;
+    rotate = (rotate % 360 + 360) % 360;
+    if (rotate == 90) {
+        rotationMode = libyuv::RotationMode::kRotate90;
+    } else if (rotate == 180) {
+        rotationMode = libyuv::RotationMode::kRotate180;
+    } else if (rotate == 270) {
+        rotationMode = libyuv::RotationMode::kRotate270;
+    } else {
+        rotate = 0;
+    }
+    uint8_t *s = cache;
+    uint8_t *d = dest;
+    if (clip) {
+        if (rotate == 90) {
+            int x = clip[1];
+            clip[1] = height - clip[2] - clip[0];
+            clip[0] = x;
+        }
+        if (rotate == 180) {
+            clip[0] = width - clip[0] - clip[2];
+            clip[1] = height - clip[1] - clip[3];
+        }
+        if (rotate == 270) {
+            int x = clip[0];
+            clip[0] = width - clip[3] - clip[1];
+            clip[1] = x;
+        }
+        LOGD("libyuv", "rotate=%d %d,%d", rotate, clip[0], clip[1]);
+        int w = clip[2];
+        int h = clip[3];
+        if (rotate % 180) {
+            h = clip[2];
+            w = clip[3];
+        }
+
+        uint8_t *dy = d;
+        uint8_t *du = dy + w * h;
+        uint8_t *dv = du + w * h / 4;
+
+        y += clip[0] + clip[1] * width;
+        u += clip[0] / 2 + clip[1] * width / 4;
+        v += clip[0] / 2 + clip[1] * width / 4;
+
+        int uvw = (w + 1) >> 1;
+        libyuv::I420Copy(y, width, u, (width + 1) >> 1, v, (width + 1) >> 1,
+                         dy, w, du, uvw, dv, uvw, w, h);
+        LOGD("libyuv", "I420Copy");
+        width = w;
+        height = h;
+        swapP(s, d);
+        setP(s, y, u, v, width, height);
+    }
+
+    uint8_t *dy = d;
+    uint8_t *du = d;
+    uint8_t *dv = d;
+    setP(d, dy, du, dv, width, height);
+    if (rotate) {
+        int w = rotate % 180 == 0 ? width : height;
+        libyuv::I420Rotate(y, width, u, width / 2, v, width / 2, dy, w, du, w / 2, dv, w / 2, width, height,
+                           rotationMode);
+        height = height == w ? width : height;
+        width = w;
+        swapP(s, d);
+        setP(s, y, u, v, width, height);
+        setP(d, dy, du, dv, width, height);
+    }
+
+    if (mirror) {
+        int w = width >> 1;
+        libyuv::I420Mirror(y, width, u, w, v, w, dy, width, du, w, dv, w, width, height);
+        swapP(s, d);
+        setP(s, y, u, v, width, height);
+        setP(d, dy, du, dv, width, height);
+    }
+
+    libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, dy, width * 4, width, height);
+
+    if (dy != dest) {
+        libyuv::CopyPlane(dy, width * height * 4, dest, width * height * 4, width * height * 4, 1);
+    }
+
+    LOGD("libyuv", "toRGB");
 }
 
 extern "C"
@@ -152,19 +246,24 @@ Java_cn_sskbskdrin_record_YUVLib_nToArgb(JNIEnv *env, jclass type, jbyteArray by
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nativeByteToBGRA(JNIEnv *env, jclass type, jbyteArray src_, jbyteArray dest_,
+Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyteArray src_, jbyteArray dest_,
                                                   jbyteArray cache_, jintArray clip_, jint width, jint height,
                                                   jint format, jint rotate, jboolean m) {
+    if (!src_ || !dest_) {
+        return;
+    }
     uint8_t *src = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_, NULL));
     uint8_t *dest = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(dest_, NULL));
-    uint8_t *cache = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(cache_, NULL));
+    uint8_t *cache;
+    if (cache_) {
+        cache = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(cache_, NULL));
+    } else {
+        cache = new uint8_t[width * height * 4];
+    }
 
     uint8_t *y = src;
     uint8_t *v = nullptr;
     uint8_t *u = nullptr;
-    LOGD("libyuv", "src=%ld dest=%ld cache=%ld", (unsigned long) src, (unsigned long) dest, (unsigned long) cache);
-    LOGD("libyuv", "  y=%ld format=%d", (unsigned long) y, format);
-
     int src_stride_uv = width;
     int src_pixel_stride_uv = 2;
     if (format == libyuv::FOURCC_NV21) {
@@ -210,18 +309,22 @@ Java_cn_sskbskdrin_record_YUVLib_nativeByteToBGRA(JNIEnv *env, jclass type, jbyt
         v = sv;
     }
 
-    toRGBA(y, u, v, dest, cache, clip, width, height, rotate, m);
+    toRGB(y, u, v, dest, cache, clip, width, height, rotate, m);
 
     env->ReleaseByteArrayElements(src_, (jbyte *) src, 0);
     env->ReleaseByteArrayElements(dest_, (jbyte *) dest, 0);
-    env->ReleaseByteArrayElements(cache_, (jbyte *) cache, 0);
+    if (cache_) {
+        env->ReleaseByteArrayElements(cache_, (jbyte *) cache, 0);
+    } else {
+        free(cache);
+    }
     if (clip)
         env->ReleaseIntArrayElements(clip_, clip, 0);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nativeYUVToBGRA(JNIEnv *env, jclass clazz, jbyteArray src_y, jbyteArray src_u,
+Java_cn_sskbskdrin_record_YUVLib_nativeYUVToRGBA(JNIEnv *env, jclass clazz, jbyteArray src_y, jbyteArray src_u,
                                                  jbyteArray src_v, jbyteArray dest_, jbyteArray cache_, jintArray clip_,
                                                  jint width, jint height, jint format, jint rotate, jboolean mirror) {
     uint8_t *srcY = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_y, NULL));
@@ -253,15 +356,7 @@ Java_cn_sskbskdrin_record_YUVLib_nativeBGRAToColor(JNIEnv *env, jclass clazz, jb
 size) {
     jbyte *src = env->GetByteArrayElements(src_, NULL);
     jint *dest = env->GetIntArrayElements(colors_, NULL);
-    size *= 4;
-    uint32_t temp = 0xff;
-    for (int i = 0; i < size; i += 4) {
-        uint32_t color = (temp & src[i]) << 16;// B
-        color |= (temp & src[i + 1]) << 8;// G
-        color |= (temp & src[i + 2]);// R
-        color |= (temp & src[i + 3]) << 24;// A
-        dest[i / 4] = color;
-    }
+    libyuv::ARGBCopy(reinterpret_cast<const uint8_t *>(src), size, reinterpret_cast<uint8_t *>(dest), size, size, 1);
     env->ReleaseByteArrayElements(src_, src, 0);
     env->ReleaseIntArrayElements(colors_, dest, 0);
 }

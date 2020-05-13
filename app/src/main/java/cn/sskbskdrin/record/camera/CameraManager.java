@@ -3,6 +3,7 @@ package cn.sskbskdrin.record.camera;
 import android.app.Activity;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -97,7 +98,8 @@ public class CameraManager implements Handler.Callback {
         if (mCamera != null) {
             throw new IllegalStateException("已经初始化过");
         }
-        mCamera = v2 ? new Camera2Impl(context) : new CameraImpl();
+        mCamera = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && v2 ? new Camera2Impl(context) :
+            new CameraImpl();
         mCamera.mManager = this;
         mCamera.surfaceView = new WeakReference<>(view);
         mCamera.init(view);
@@ -198,6 +200,10 @@ public class CameraManager implements Handler.Callback {
 
     public int getPreviewHeight() {
         return mCamera.previewHeight;
+    }
+
+    public int getPreviewFormat() {
+        return mCamera.mPreviewFormat;
     }
 
     private void processEnterState(int state) {
@@ -380,7 +386,7 @@ public class CameraManager implements Handler.Callback {
          * This method is invoked when delivery of the frame needs to be done.
          * The returned values - is a modified frame which needs to be displayed on the screen.
          */
-        void onCameraFrame(byte[] inputFrame, int format, int width, int height);
+        void onCameraFrame(byte[] bytes, byte[] uBytes, byte[] vBytes, int format, int width, int height, boolean v2);
 
         void onCameraError();
     }
@@ -412,7 +418,6 @@ public class CameraManager implements Handler.Callback {
 
         private WeakReference<SurfaceView> surfaceView;
         protected SurfaceTexture surfaceTexture;
-        protected Surface surface;
 
         protected CameraManager mManager;
 
@@ -436,9 +441,21 @@ public class CameraManager implements Handler.Callback {
 
         protected Size getViewSize() {
             SurfaceView view = getSurfaceView();
-            Log.d(TAG, "getViewSize: " + view.getMeasuredWidth());
-            return view == null ? new Size(viewWidth, viewHeight) : new Size(view.getMeasuredWidth(),
-                view.getMeasuredHeight());
+            int w = 0;
+            int h = 0;
+            while (view != null && w == 0) {
+                w = view.getWidth();
+                h = view.getHeight();
+                if (w == 0) {
+                    Thread.yield();
+                }
+            }
+            if (w == 0 || h == 0) {
+                w = viewWidth;
+                h = viewHeight;
+            }
+            Log.d(TAG, "getViewSize: " + w + "x" + h);
+            return new Size(w, h);
         }
 
         protected SurfaceView getSurfaceView() {
@@ -506,7 +523,15 @@ public class CameraManager implements Handler.Callback {
 
     void onPreviewFrame(byte[] data) {
         if (mListener != null && mCamera != null) {
-            mListener.onCameraFrame(data, mCamera.mPreviewFormat, mCamera.previewWidth, mCamera.previewHeight);
+            mListener.onCameraFrame(data, null, null, mCamera.mPreviewFormat, mCamera.previewWidth,
+                mCamera.previewHeight, false);
+        }
+    }
+
+    void onPreviewFrame(byte[] srcY, byte[] srcU, byte[] srcV) {
+        if (mListener != null && mCamera != null) {
+            mListener.onCameraFrame(srcY, srcU, srcV, mCamera.mPreviewFormat, mCamera.previewWidth,
+                mCamera.previewHeight, true);
         }
     }
 

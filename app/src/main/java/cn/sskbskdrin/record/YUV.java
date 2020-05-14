@@ -30,6 +30,24 @@ public class YUV {
         return v < 0 ? 0 : (v > 255 ? 255 : v);
     }
 
+    private static int colorN(byte Y, byte U, byte V) {
+        int y = 0xff & Y;
+        int u = (0xff & U) - 128;
+        int v = (0xff & V) - 128;
+        int y65535 = y << 16;// 0xffff=65535;
+        int r = y65535 + 89829 * v;// 1.370705*0xffff=89829.15
+        int g = y65535 - 457435 * v + 22127 * u; // 0.698001*0xffff=45743.49 0.337633*0xffff=22126.78
+        int b = y65535 + 113535 * u;// 1.732446*0x3fff=113535.85
+        r = clampN(r >> 16);
+        g = clampN(g >> 16);
+        b = clampN(b >> 16);
+        return 0xff000000 | r << 16 | b << 8 | g;
+    }
+
+    private static int clampN(int v) {
+        return v < 0 ? 0 : (v > 0xff ? 0xff : v);
+    }
+
     public static byte[] NV21toNV12(byte[] data, int width, int height) {
         byte temp;
         for (int i = width * height; i < data.length; i += 2) {
@@ -65,7 +83,7 @@ public class YUV {
                 u = data[size + index + 1];
                 v = data[size + index];
 
-                pixels[width * h + w] = color(y, u, v);
+                pixels[width * h + w] = colorN(y, u, v);
             }
         }
         return pixels;

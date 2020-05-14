@@ -1,4 +1,4 @@
-package cn.sskbskdrin.record;
+package cn.sskbskdrin.lib.yuv;
 
 import android.graphics.ImageFormat;
 
@@ -104,7 +104,7 @@ public class YUVLib {
         return v < 65535 ? 65535 : (v > 0xffffff ? 0xffffff : v);
     }
 
-    public static void yuv420spToARGB(byte[] src, int[] dest, int width, int height) {
+    private static void yuv420spToARGB(byte[] src, int[] dest, int width, int height) {
         int uv = width * height;
         for (int i = 0; i < height; i++) {
             int line = i * width;
@@ -173,6 +173,14 @@ public class YUVLib {
         nativeScaleRGBA(src, width, height, dest, dWidth, dHeight, quality);
     }
 
+    public static void RGBToRGBA(byte[] rgb, byte[] rgba, int size, boolean reverse) {
+        nativeRGBToRGBA(rgb, rgba, size, reverse);
+    }
+
+    public static void RGBAToColor(byte[] src, int[] colors, int srcSize) {
+        nativeBGRAToColor(src, colors, srcSize);
+    }
+
     private static native void nativeByteToRGBA(byte[] src, byte[] dest, byte[] cache, int[] clip, int width,
                                                 int height, int format, int rotate, boolean mirror, boolean hasAlpha);
 
@@ -183,8 +191,10 @@ public class YUVLib {
     private static native void nativeSplitRGBA(byte[] rgba, byte[] r, byte[] g, byte[] b, byte[] a, int srcSize,
                                                boolean hasAlpha);
 
-    public static native void nativeBGRAToColor(byte[] src, int[] colors, int srcSize);
+    private static native void nativeBGRAToColor(byte[] src, int[] colors, int srcSize);
 
     private static native void nativeScaleRGBA(byte[] src, int width, int height, byte[] dest, int dWidth,
                                                int dHeight, int quality);
+
+    private static native void nativeRGBToRGBA(byte[] rgb, byte[] rgba, int size, boolean reverse);
 }

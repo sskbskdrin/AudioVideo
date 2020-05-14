@@ -3,7 +3,7 @@
 //
 
 #include "libyuv.h"
-#include "../log.h"
+#include "log.h"
 
 #include <string.h>
 #include <jni.h>
@@ -21,7 +21,7 @@ inline void setP(uint8_t *&s, uint8_t *&y, uint8_t *&u, uint8_t *&v, int w, int 
 }
 
 void toRGBA(uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *dest, uint8_t *cache, int *clip, int width, int height, int
-rotate, bool mirror, bool hasAlpha) {
+rotate, bool mirror, bool hasAlpha, bool NV21 = false) {
     libyuv::RotationMode rotationMode = libyuv::RotationMode::kRotate0;
     rotate = (rotate % 360 + 360) % 360;
     if (rotate == 90) {
@@ -100,7 +100,11 @@ rotate, bool mirror, bool hasAlpha) {
     }
 
     if (hasAlpha) {
-        libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, dy, width * 4, width, height);
+        if (NV21) {
+            libyuv::I420ToARGB(y, width, u, width / 2, v, width / 2, dy, width * 4, width, height);
+        } else {
+            libyuv::I420ToABGR(y, width, u, width / 2, v, width / 2, dy, width * 4, width, height);
+        }
     } else {
         libyuv::I420ToRGB24(y, width, u, width / 2, v, width / 2, dy, width * 3, width, height);
     }
@@ -113,10 +117,10 @@ rotate, bool mirror, bool hasAlpha) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyteArray src_, jbyteArray dest_,
-                                                  jbyteArray cache_, jintArray clip_, jint width, jint height,
-                                                  jint format, jint rotate, jboolean m,
-                                                  jboolean hasAlpha) {
+Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyteArray src_, jbyteArray dest_,
+                                                   jbyteArray cache_, jintArray clip_, jint width, jint height,
+                                                   jint format, jint rotate, jboolean m,
+                                                   jboolean hasAlpha) {
     if (!src_ || !dest_) {
         return;
     }
@@ -174,7 +178,7 @@ Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyt
         v = sv;
     }
 
-    toRGBA(y, u, v, dest, cache, clip, width, height, rotate, m, hasAlpha);
+    toRGBA(y, u, v, dest, cache, clip, width, height, rotate, m, hasAlpha, src_pixel_stride_uv == 2);
 
     env->ReleaseByteArrayElements(src_, (jbyte *) src, 0);
     env->ReleaseByteArrayElements(dest_, (jbyte *) dest, 0);
@@ -189,10 +193,11 @@ Java_cn_sskbskdrin_record_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jbyt
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nativeYUVToRGBA(JNIEnv *env, jclass clazz, jbyteArray src_y, jbyteArray src_u,
-                                                 jbyteArray src_v, jbyteArray dest_, jbyteArray cache_, jintArray clip_,
-                                                 jint width, jint height, jint format, jint rotate, jboolean mirror,
-                                                 jboolean hasAlpha) {
+Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeYUVToRGBA(JNIEnv *env, jclass clazz, jbyteArray src_y, jbyteArray src_u,
+                                                  jbyteArray src_v, jbyteArray dest_, jbyteArray cache_,
+                                                  jintArray clip_,
+                                                  jint width, jint height, jint format, jint rotate, jboolean mirror,
+                                                  jboolean hasAlpha) {
     uint8_t *srcY = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_y, NULL));
     uint8_t *srcU = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_u, NULL));
     uint8_t *srcV = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_v, NULL));
@@ -218,9 +223,9 @@ Java_cn_sskbskdrin_record_YUVLib_nativeYUVToRGBA(JNIEnv *env, jclass clazz, jbyt
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nativeSplitRGBA(JNIEnv *env, jclass clazz, jbyteArray rgba_, jbyteArray r_,
-                                                 jbyteArray g_, jbyteArray b_, jbyteArray a_, jint size, jboolean
-                                                 has_alpha) {
+Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeSplitRGBA(JNIEnv *env, jclass clazz, jbyteArray rgba_, jbyteArray r_,
+                                                  jbyteArray g_, jbyteArray b_, jbyteArray a_, jint size, jboolean
+                                                  has_alpha) {
     uint8_t *rgba = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(rgba_, NULL));
     uint8_t *r = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(r_, NULL));
     uint8_t *g = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(g_, NULL));
@@ -250,8 +255,8 @@ Java_cn_sskbskdrin_record_YUVLib_nativeSplitRGBA(JNIEnv *env, jclass clazz, jbyt
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nativeScaleRGBA(JNIEnv *env, jclass clazz, jbyteArray src_, jint width, jint height,
-                                                 jbyteArray dest_, jint d_width, jint d_height, jint quality) {
+Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeScaleRGBA(JNIEnv *env, jclass clazz, jbyteArray src_, jint width, jint height,
+                                                  jbyteArray dest_, jint d_width, jint d_height, jint quality) {
     uint8_t *src = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(src_, NULL));
     uint8_t *dest = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(dest_, NULL));
     libyuv::FilterMode mode;
@@ -268,13 +273,29 @@ Java_cn_sskbskdrin_record_YUVLib_nativeScaleRGBA(JNIEnv *env, jclass clazz, jbyt
     env->ReleaseByteArrayElements(src_, (jbyte *) src, 0);
     env->ReleaseByteArrayElements(dest_, (jbyte *) dest, 0);
 }
+
 extern "C"
 JNIEXPORT void JNICALL
-Java_cn_sskbskdrin_record_YUVLib_nativeBGRAToColor(JNIEnv *env, jclass clazz, jbyteArray src_, jintArray colors_, jint
+Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeBGRAToColor(JNIEnv *env, jclass clazz, jbyteArray src_, jintArray colors_, jint
 size) {
     jbyte *src = env->GetByteArrayElements(src_, NULL);
     jint *dest = env->GetIntArrayElements(colors_, NULL);
     libyuv::ARGBCopy(reinterpret_cast<const uint8_t *>(src), size, reinterpret_cast<uint8_t *>(dest), size, size, 1);
     env->ReleaseByteArrayElements(src_, src, 0);
     env->ReleaseIntArrayElements(colors_, dest, 0);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeRGBToRGBA(JNIEnv *env, jclass clazz, jbyteArray rgb_, jbyteArray rgba_, jint
+width, jboolean reverse) {
+    uint8_t *rgb = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(rgb_, NULL));
+    uint8_t *rgba = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(rgba_, NULL));
+    if (reverse) {
+        libyuv::ARGBToRGB24(rgba, width * 4, rgb, width * 3, width, 1);
+    } else {
+        libyuv::RGB24ToARGB(rgb, width * 3, rgba, width * 4, width, 1);
+    }
+    env->ReleaseByteArrayElements(rgb_, (jbyte *) rgb, 0);
+    env->ReleaseByteArrayElements(rgba_, (jbyte *) rgba, 0);
 }

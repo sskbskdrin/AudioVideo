@@ -37,7 +37,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
         Class clazz = null;
         switch (v.getId()) {
             case R.id.main_camera:
-                clazz = cn.sskbskdrin.record.camera.MainActivity.class;
+                clazz = CameraActivity.class;
                 break;
             case R.id.main_audio:
                 clazz = AudioActivity.class;

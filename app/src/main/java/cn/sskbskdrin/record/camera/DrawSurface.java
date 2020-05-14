@@ -3,6 +3,10 @@ package cn.sskbskdrin.record.camera;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
@@ -28,6 +32,7 @@ public class DrawSurface extends View implements Handler.Callback {
 
     WorkThread workThread;
     Bitmap cacheBitmap;
+    Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     @Override
     protected void onAttachedToWindow() {
@@ -35,6 +40,9 @@ public class DrawSurface extends View implements Handler.Callback {
         workThread = new WorkThread("DrawThread");
         workThread.start();
         workThread.setHandlerCallback(this);
+        paint.setStrokeWidth(5);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setColor(Color.RED);
     }
 
     @Override
@@ -50,11 +58,30 @@ public class DrawSurface extends View implements Handler.Callback {
         postInvalidate();
     }
 
+    public void send(RectF rect) {
+        rectF.left = rect.left * width;
+        rectF.top = rect.top * height;
+        rectF.right = rect.right * width;
+        rectF.bottom = rect.bottom * height;
+        postInvalidate();
+    }
+
+    private RectF rectF = new RectF();
+    int width;
+    int height;
+
     @Override
     protected void onDraw(Canvas canvas) {
+        if (width == 0) {
+            width = getMeasuredWidth();
+            height = getMeasuredHeight();
+        }
         canvas.drawColor(0);
         if (cacheBitmap != null) {
             canvas.drawBitmap(cacheBitmap, 0, 0, null);
+        }
+        if (rectF != null) {
+            canvas.drawRect(rectF, paint);
         }
     }
 
@@ -66,5 +93,52 @@ public class DrawSurface extends View implements Handler.Callback {
         //        canvas.drawBitmap(cacheBitmap, 0, 0, null);
         //        getHolder().unlockCanvasAndPost(canvas);
         return true;
+    }
+
+    public enum AlignMode {
+        LEFT_TOP, LEFT_CENTER, LEFT_BOTTOM, TOP_CENTER, RIGHT_TOP, RIGHT_CENTER, RIGHT_BOTTOM, BOTTOM_CENTER, CENTER
+    }
+
+    public static void drawText(Canvas canvas, String text, float x, float y, AlignMode mode, Paint paint) {
+        Rect r = new Rect();
+        paint.getTextBounds(text, 0, text.length(), r);
+        float height = r.height();
+        y -= r.bottom;
+        switch (mode) {
+            case LEFT_TOP:
+                paint.setTextAlign(Paint.Align.LEFT);
+                y += height;
+                break;
+            case LEFT_CENTER:
+                paint.setTextAlign(Paint.Align.LEFT);
+                y += height / 2;
+                break;
+            case LEFT_BOTTOM:
+                paint.setTextAlign(Paint.Align.LEFT);
+                break;
+            case TOP_CENTER:
+                paint.setTextAlign(Paint.Align.CENTER);
+                y += height;
+                break;
+            case RIGHT_TOP:
+                paint.setTextAlign(Paint.Align.RIGHT);
+                y += height;
+                break;
+            case RIGHT_CENTER:
+                paint.setTextAlign(Paint.Align.RIGHT);
+                y += height / 2;
+                break;
+            case RIGHT_BOTTOM:
+                paint.setTextAlign(Paint.Align.RIGHT);
+                break;
+            case BOTTOM_CENTER:
+                paint.setTextAlign(Paint.Align.CENTER);
+                break;
+            case CENTER:
+                paint.setTextAlign(Paint.Align.CENTER);
+                y += height / 2;
+                break;
+        }
+        canvas.drawText(text, x, y, paint);
     }
 }

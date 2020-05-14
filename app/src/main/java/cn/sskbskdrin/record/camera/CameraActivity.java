@@ -1,191 +1,152 @@
 package cn.sskbskdrin.record.camera;
 
-import android.Manifest;
 import android.graphics.Bitmap;
-import android.graphics.ImageFormat;
-import android.graphics.Point;
-import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.Window;
-import android.view.WindowManager;
+import android.view.View;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 
-import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
-import cn.sskbskdrin.log.L;
+import cn.sskbskdrin.lib.yuv.YUVCache;
 import cn.sskbskdrin.record.R;
-import cn.sskbskdrin.record.YUVLib;
+import cn.sskbskdrin.record.YUV;
 
-public class CameraActivity extends BaseActivity implements SurfaceHolder.Callback, BaseCamera.CameraListener {
+public class CameraActivity extends BaseActivity implements SurfaceHolder.Callback {
     private static final String TAG = "MainActivity";
 
-    private SurfaceView surfaceView;
-    private SurfaceHolder surfaceHolder;
-
-    private int width = 800;
-    private int height = 600;
+    private CameraManager cameraManager = new CameraManager();
     private ImageView imageView;
-    private boolean cut = false;
-    private boolean isCamera2 = true;
-    private BaseCamera camera;
+    private SurfaceView view;
+    private DrawSurface drawView;
+    AtomicBoolean isCut = new AtomicBoolean(false);
+
+    private boolean v2;
+    private boolean front;
+    YUVCache factory = new YUVCache();
+
+    CameraManager.CameraListener listener = new CameraManager.CameraListener() {
+        @Override
+        public void onCameraStarted(int width, int height) {
+        }
+
+        @Override
+        public void onCameraStopped() {
+
+        }
+
+        @Override
+        public void onCameraFrame(byte[] bytes, byte[] uBytes, byte[] vBytes, int format, int width, int height,
+                                  boolean v2) {
+            int rotate = cameraManager != null ? cameraManager.getOrientation() : 0;
+            if (v2) {
+                drawView.send(factory.getBitmap(bytes, uBytes, vBytes, new int[]{205, 205, 300, 400}, width, height,
+                    rotate + (front ? 180 : 0), front));
+            } else {
+                //                drawView.send(factory.getBitmap(bytes, width, height, format, rotate + (front ? 180
+                //                : 0), front));
+                long time = System.currentTimeMillis();
+                int[] pixels = YUV.NV21toARGB(bytes, width, height);
+                Log.d(TAG, "onCameraFrame: time=" + (System.currentTimeMillis() - time));
+                Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+                drawView.send(bitmap);
+            }
+        }
+
+        @Override
+        public void onCameraError() {
+
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_camera);
-
-        checkPermission(1001, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE);
-
-        surfaceView = findViewById(R.id.camera_surface);
-        surfaceHolder = surfaceView.getHolder();
-        surfaceHolder.addCallback(this);
+        view = findViewById(R.id.camera_surface);
+        cameraManager.init(this, view, false);
+        cameraManager.setCameraListener(listener);
         imageView = findViewById(R.id.camera_img);
-        imageView.setOnClickListener(v -> imageView.setImageDrawable(null));
-        findViewById(R.id.camera_next).setOnClickListener(v -> cut = true);
-        ((CheckBox) findViewById(R.id.camera_check)).setOnCheckedChangeListener((buttonView, isChecked) -> {
-            isCamera2 = isChecked;
-            reStartCamera();
+        drawView = findViewById(R.id.draw_surface);
+
+        ((CheckBox) findViewById(R.id.camera_check)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                v2 = isChecked;
+                change();
+            }
+        });
+
+        ((CheckBox) findViewById(R.id.camera_id)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                front = isChecked;
+                change();
+            }
+        });
+
+        view.getHolder().addCallback(this);
+        findViewById(R.id.camera_next).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                isCut.set(true);
+            }
         });
     }
 
-    @Override
-    public void surfaceCreated(SurfaceHolder surfaceHolder) {
-        reStartCamera();
+    private void change() {
+        cameraManager.release();
+        cameraManager = null;
+
+        cameraManager = new CameraManager();
+        cameraManager.init(this, view, v2);
+        cameraManager.setCameraId(front ? CameraManager.CameraId.FRONT : CameraManager.CameraId.BACK);
+        cameraManager.setCameraListener(listener);
+        cameraManager.setEnabled(true);
     }
 
     @Override
-    public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
-        if (camera != null) {
-            camera.fixSurfaceView(surfaceView);
-        }
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "onResume: ");
+        //        cameraManager.setEnabled(true);
+        //        view.getHolder().setFixedSize(view.getMeasuredWidth(), view.getMeasuredHeight());
+        //        view.getHolder().setFixedSize(cameraManager.getPreviewWidth(), cameraManager.getPreviewHeight());
     }
 
     @Override
-    public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
-        stopCamera();
-    }
-
-    private void reStartCamera() {
-        stopCamera();
-        if (isCamera2) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                camera = new Camera2Manager(this, this);
-            } else {
-                showToast("不支持Camera2");
-                return;
-            }
-        } else {
-            camera = new Camera1Manager(this);
-        }
-        camera.setCameraListener(this);
-        camera.setFrameCallback(true);
-        camera.setPreviewFormat(ImageFormat.NV21);
-        camera.open();
-    }
-
-    /**
-     * 关闭摄像头
-     */
-    private void stopCamera() {
-        if (camera != null) {
-            camera.close();
-            camera = null;
+    protected void onPause() {
+        super.onPause();
+        if (cameraManager != null) {
+            //            cameraManager.setEnabled(false);
         }
     }
 
     @Override
-    public void getSurfaceList(ArrayList<Surface> list) {
+    public void surfaceCreated(SurfaceHolder holder) {
+        if (cameraManager == null) {
+            cameraManager = new CameraManager();
+        }
     }
 
     @Override
-    public SurfaceHolder getSurfaceHolder() {
-        return surfaceHolder;
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        if (cameraManager != null) {
+            cameraManager.setEnabled(true);
+        }
     }
 
     @Override
-    public Point getPreviewSize(List<Point> list) {
-        L.append("support preview=");
-        for (Point p : list) {
-            L.append(p.x + "x" + p.y + ",");
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        if (cameraManager != null) {
+            cameraManager.release();
         }
-        L.i(TAG, "");
-        surfaceView.post(() -> surfaceHolder.setFixedSize(width, height));
-        return new Point(width, height);
-    }
-
-    @Override
-    public BaseCamera.CameraID getCameraId() {
-        return BaseCamera.CameraID.CAMERA_FRONT;
-    }
-
-    @Override
-    public void onPreviewFrame(byte[] data) {
-        Log.i(TAG, "onPreviewFrame: ");
-        if (cut) {
-            new CutImage(imageView, width, height).execute(data);
-            cut = false;
-        }
-    }
-
-    private static class CutImage extends AsyncTask<byte[], Integer, Bitmap> {
-        private WeakReference<ImageView> view;
-        private int width;
-        private int height;
-
-        private CutImage(ImageView view, int width, int height) {
-            this.view = new WeakReference<>(view);
-            this.width = width;
-            this.height = height;
-        }
-
-        @Override
-        protected Bitmap doInBackground(byte[]... bytes) {
-            byte[] src = bytes[0];
-            Bitmap bitmap;
-            System.out.println("data length=" + src.length);
-            byte[] dest = new byte[width * height * 4];
-
-            rotate(src, dest, ImageFormat.NV21, 90);
-
-            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(dest));
-            return bitmap;
-        }
-
-        private void rotate(byte[] src, byte[] dest, int format, int degree) {
-            //            YUVLib.toArgb(src, dest, width, height, format, degree);
-            //            YUVLib.toAbgr(src, dest, width, height, format, degree);
-            //            YUVLib.toABGR(src, dest, width, height, format, degree);
-            YUVLib.byteToRGBA(src, dest, new byte[dest.length], null, width, height, format, degree, false);
-            //            YUV.toArgb(src, dest, width, height, format, degree);
-
-            int w = width;
-            int h = height;
-            if (degree % 180 != 0) {
-                width = h;
-                height = w;
-            }
-        }
-
-        @Override
-        protected void onPostExecute(Bitmap bitmap) {
-            ImageView img = view.get();
-            if (img != null) {
-                img.setImageBitmap(bitmap);
-            }
-        }
+        cameraManager = null;
     }
 }

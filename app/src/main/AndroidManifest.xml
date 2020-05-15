@@ -44,7 +44,8 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".camera.CameraActivity"/>
+        <activity android:name=".camera.CameraActivity"
+            android:screenOrientation="landscape"/>
         <activity android:name=".audio.AudioActivity"/>
         <activity android:name=".video.VideoActivity"/>
         <activity android:name=".opengl.OpenGlActivity"/>

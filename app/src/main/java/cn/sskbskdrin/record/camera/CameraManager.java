@@ -2,6 +2,8 @@ package cn.sskbskdrin.record.camera;
 
 import android.app.Activity;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 import android.os.Handler;
@@ -9,7 +11,10 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.view.Surface;
+import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.TextureView;
+import android.view.View;
 import android.view.ViewGroup;
 
 import java.lang.ref.WeakReference;
@@ -44,7 +49,8 @@ public class CameraManager implements Handler.Callback {
     protected CameraId mCameraIndex = CameraId.BACK;
     private boolean mEnabled = false;
     private int mState = STOPPED;
-    private CameraListener mListener;
+    private CameraStatusListener mListener;
+    CameraFrameListener mFrameListener;
 
     //    private HandlerThread workThread;
     //    private Handler workHandler;
@@ -72,11 +78,17 @@ public class CameraManager implements Handler.Callback {
                 mCamera.takePicture(this);
                 break;
             case WHAT_START_PREVIEW:
-                mCamera.startPreview();
+                Log.d(TAG, "startPreview: ");
+                if (mCamera != null) {
+                    mCamera.startPreview();
+                }
                 break;
             case WHAT_RELEASE:
                 mEnabled = false;
                 checkCurrentState();
+                if (mCamera != null) {
+                    mCamera.release();
+                }
                 mCamera = null;
                 mainHandler.post(new Runnable() {
                     @Override
@@ -95,31 +107,32 @@ public class CameraManager implements Handler.Callback {
     }
 
     public void init(Activity context, SurfaceView view, boolean v2) {
-        if (mCamera != null) {
-            throw new IllegalStateException("已经初始化过");
-        }
-        mCamera = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && v2 ? new Camera2Impl(context) :
-            new CameraImpl();
-        mCamera.mManager = this;
-        mCamera.surfaceView = new WeakReference<>(view);
-        mCamera.init(view);
-        mCamera.surfaceOrientation = getOrientationDegree(context.getWindowManager().getDefaultDisplay().getRotation());
-        workThread = new WorkThread("CameraThread");
-        workThread.start();
-        workThread.setHandlerCallback(this);
+        init(context, view, 0, 0, v2);
     }
 
-    public void init(Activity context, SurfaceTexture texture, int width, int height) {
+    public void init(Activity context, TextureView texture, boolean v2) {
+        init(context, texture, 0, 0, v2);
+    }
+
+    public void init(Activity context, SurfaceTexture texture, int width, int height, boolean v2) {
+        init(context, (Object) texture, width, height, v2);
+    }
+
+    private void init(Activity context, Object object, int width, int height, boolean v2) {
         if (mCamera != null) {
             throw new IllegalStateException("已经初始化过");
         }
-        mCamera = new CameraImpl();
+        mCamera = ICamera.create(context, v2);
         mCamera.mManager = this;
         mCamera.viewWidth = width;
         mCamera.viewHeight = height;
-        mCamera.surfaceTexture = texture;
-        mCamera.init(texture);
-        mCamera.surfaceOrientation = getOrientationDegree(context.getWindowManager().getDefaultDisplay().getRotation());
+        if (object instanceof SurfaceView) {
+            mCamera.init((SurfaceView) object);
+        } else if (object instanceof TextureView) {
+            mCamera.init((TextureView) object);
+        } else {
+            mCamera.init((SurfaceTexture) object);
+        }
         workThread = new WorkThread("CameraThread");
         workThread.start();
         workThread.setHandlerCallback(this);
@@ -148,8 +161,12 @@ public class CameraManager implements Handler.Callback {
         getWorkHandler().obtainMessage(WHAT_ENABLE_CHANGE, enabled ? 1 : 0, 0).sendToTarget();
     }
 
-    public void setCameraListener(CameraListener listener) {
+    public void setCameraStatusListener(CameraStatusListener listener) {
         mListener = listener;
+    }
+
+    public void setCameraFrameListener(CameraFrameListener listener) {
+        this.mFrameListener = listener;
     }
 
     /**
@@ -207,7 +224,7 @@ public class CameraManager implements Handler.Callback {
     }
 
     private void processEnterState(int state) {
-        Log.d(TAG, "call processEnterState: " + state);
+        Log.d(TAG, "call processEnterState: " + (state == STARTED ? "start" : "stop"));
         switch (state) {
             case STARTED:
                 if (onEnterStartedState()) {
@@ -245,7 +262,7 @@ public class CameraManager implements Handler.Callback {
     }
 
     private void processExitState(int state) {
-        Log.d(TAG, "call processExitState: " + state);
+        Log.d(TAG, "call processExitState: " + (state == STARTED ? "start" : "stop"));
         switch (state) {
             case STARTED:
                 onExitStartedState();
@@ -267,9 +284,9 @@ public class CameraManager implements Handler.Callback {
     // NOTE: The order of bitmap constructor and camera connection is important for android 4.1.x
     // Bitmap must be constructed before surface
     private boolean onEnterStartedState() {
-        Log.d(TAG, "call onEnterStartedState");
+        Log.d(TAG, "connectCamera: ");
         if (mCamera.connectCamera()) {
-            mCamera.fixSurfaceView();
+            mCamera.fixViewSize();
             return true;
         }
         return false;
@@ -352,7 +369,7 @@ public class CameraManager implements Handler.Callback {
         return mCamera.surfaceOrientation;
     }
 
-    private int getOrientationDegree(int windowDegree) {
+    private static int getOrientationDegree(int windowDegree) {
         switch (windowDegree) {
             case Surface.ROTATION_0:
                 return 90;
@@ -366,7 +383,7 @@ public class CameraManager implements Handler.Callback {
         }
     }
 
-    public interface CameraListener {
+    public interface CameraStatusListener {
         /**
          * This method is invoked when camera preview has started. After this method is invoked
          * the frames will start to be delivered to client via the onCameraFrame() callback.
@@ -382,13 +399,15 @@ public class CameraManager implements Handler.Callback {
          */
         void onCameraStopped();
 
+        void onCameraError();
+    }
+
+    public interface CameraFrameListener {
         /**
          * This method is invoked when delivery of the frame needs to be done.
          * The returned values - is a modified frame which needs to be displayed on the screen.
          */
         void onCameraFrame(byte[] bytes, byte[] uBytes, byte[] vBytes, int format, int width, int height, boolean v2);
-
-        void onCameraError();
     }
 
     interface SizeAccessor {
@@ -417,7 +436,9 @@ public class CameraManager implements Handler.Callback {
         protected int mPreviewFormat = ImageFormat.NV21;
 
         private WeakReference<SurfaceView> surfaceView;
+        private WeakReference<TextureView> textureView;
         protected SurfaceTexture surfaceTexture;
+        protected Surface surface;
 
         protected CameraManager mManager;
 
@@ -429,6 +450,17 @@ public class CameraManager implements Handler.Callback {
         protected int previewWidth;
         protected int previewHeight;
 
+        private Size initialSize;
+
+        static ICamera create(Activity context, boolean v2) {
+            ICamera camera = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && v2 ? new Camera2Impl(context) :
+                new CameraImpl();
+            camera.surfaceOrientation = getOrientationDegree(context.getWindowManager()
+                .getDefaultDisplay()
+                .getRotation());
+            return camera;
+        }
+
         protected ICamera() {}
 
         protected void init(SurfaceView view) {
@@ -439,8 +471,15 @@ public class CameraManager implements Handler.Callback {
             surfaceTexture = texture;
         }
 
+        protected void init(TextureView view) {
+            textureView = new WeakReference<>(view);
+        }
+
         protected Size getViewSize() {
-            SurfaceView view = getSurfaceView();
+            if (initialSize != null) {
+                return initialSize;
+            }
+            View view = getSurfaceView();
             int w = 0;
             int h = 0;
             while (view != null && w == 0) {
@@ -455,19 +494,55 @@ public class CameraManager implements Handler.Callback {
                 h = viewHeight;
             }
             Log.d(TAG, "getViewSize: " + w + "x" + h);
-            return new Size(w, h);
+            initialSize = new Size(w, h);
+            return initialSize;
         }
 
-        protected SurfaceView getSurfaceView() {
-            return surfaceView == null ? null : surfaceView.get();
-        }
 
-        private void fixSurfaceView() {
-            SurfaceView view = getSurfaceView();
+        protected View getSurfaceView() {
+            View view = surfaceView == null ? null : surfaceView.get();
             if (view == null) {
-                return;
+                view = textureView == null ? null : textureView.get();
             }
-            view.post(new Runnable() {
+            return view;
+        }
+
+        /**
+         * v1版本，使用SurfaceView时调用
+         */
+        protected SurfaceHolder getSurfaceHolder() {
+            SurfaceView view = surfaceView == null ? null : surfaceView.get();
+            return view == null ? null : view.getHolder();
+        }
+
+        protected SurfaceTexture getSurfaceTexture() {
+            TextureView texture = textureView == null ? null : textureView.get();
+            if (texture != null) {
+                return texture.getSurfaceTexture();
+            }
+            return surfaceTexture;
+        }
+
+        /**
+         * v2版本使用
+         */
+        protected Surface getSurface() {
+            SurfaceView view = surfaceView == null ? null : surfaceView.get();
+            if (view != null) {
+                return view.getHolder().getSurface();
+            }
+            TextureView texture = textureView == null ? null : textureView.get();
+            if (texture != null) {
+                surface = new Surface(texture.getSurfaceTexture());
+            }
+            if (surface == null && surfaceTexture != null) {
+                surface = new Surface(surfaceTexture);
+            }
+            return surface;
+        }
+
+        private void fixViewSize() {
+            mManager.mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
                     Size size = getViewSize();
@@ -475,32 +550,79 @@ public class CameraManager implements Handler.Callback {
                     if (isP) {
                         size = new Size(size.height, size.width);
                     }
-                    float scaleW = size.width * 1f / previewWidth;
-                    float scaleH = size.height * 1f / previewHeight;
-                    int h = size.height;
-                    int w = size.width;
-                    if (scaleW > scaleH) {
-                        w = (int) (previewWidth * scaleH);
+
+                    float scale = Math.max(previewWidth * 1f / size.width, previewHeight * 1f / size.height);
+
+                    size.width = Math.round(previewWidth / scale);
+                    size.height = Math.round(previewHeight / scale);
+
+                    View view = getSurfaceView();
+                    if (view != null) {
+                        ViewGroup.LayoutParams lp = view.getLayoutParams();
+                        lp.width = size.width;
+                        lp.height = size.height;
+                        if (isP) {
+                            lp.width = size.height;
+                            lp.height = size.width;
+                        }
+                        view.requestLayout();
+                        if (getSurfaceHolder() != null) {
+                            getSurfaceHolder().setFixedSize(previewWidth, previewHeight);
+                        }
+                        if (getSurfaceTexture() != null) {
+                            getSurfaceTexture().setDefaultBufferSize(previewWidth, previewHeight);
+                            if (ICamera.this instanceof Camera2Impl) {
+                                if (!isP) {
+                                    Matrix matrix = new Matrix();
+                                    matrix.preRotate(-90, previewWidth / 2f, previewHeight / 2f);
+
+                                    Log.d(TAG, "run: scaleW=" + (float) lp.width / previewHeight);
+                                    Log.d(TAG, "run: scaleH=" + (float) lp.height / previewWidth);
+                                    Log.d(TAG, "run: width=" + (float) lp.width / previewHeight);
+                                    // TODO 待优化
+
+                                    matrix.postScale((float) lp.width / previewHeight,
+                                        (float) lp.height / previewWidth, previewHeight / 2f, previewWidth / 2f);
+                                    textureView.get().setTransform(matrix);
+                                }
+                            }
+                        }
+                        Log.d(TAG, "fixSurfaceView: lp=" + lp.width + "x" + lp.height + " view=" + size);
+                    } else if (surfaceTexture != null) {
+                        surfaceTexture.setDefaultBufferSize(previewWidth, previewHeight);
                     } else {
-                        h = (int) (previewHeight * scaleW);
+                        throw new IllegalStateException("没有设置预览surface");
                     }
-                    ViewGroup.LayoutParams lp = view.getLayoutParams();
-                    lp.width = w;
-                    lp.height = h;
-                    if (isP) {
-                        lp.width = h;
-                        lp.height = w;
-                    }
-                    view.requestLayout();
-                    //                    w = lp.width < lp.height ? previewWidth : previewHeight;
-                    //                    h = lp.width < lp.height ? previewHeight : previewWidth;
-                    view.getHolder().setFixedSize(previewWidth, previewHeight);
                     if (mManager != null && mManager.getWorkHandler() != null) {
                         mManager.getWorkHandler().sendEmptyMessage(WHAT_START_PREVIEW);
                     }
-                    Log.d(TAG, "fixSurfaceView: lp=" + lp.width + "x" + lp.height + " view=" + size);
                 }
             });
+        }
+
+        private Matrix configureTransform(int viewWidth, int viewHeight) {
+            Matrix matrix = new Matrix();
+            RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
+            RectF bufferRect = new RectF(0, 0, previewWidth, previewHeight);
+            float centerX = viewRect.centerX();
+            float centerY = viewRect.centerY();
+            if (surfaceOrientation == 0 || surfaceOrientation == 180) {
+                bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+                matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
+                float scale = Math.max((float) viewHeight / previewHeight, (float) viewWidth / previewWidth);
+                matrix.postScale(scale, scale, centerX, centerY);
+                matrix.postRotate(90, centerX, centerY);
+            } else if (surfaceOrientation == 270) {
+                matrix.postRotate(180, centerX, centerY);
+            }
+            return matrix;
+        }
+
+        protected void release() {
+            if (surface != null) {
+                surface.release();
+            }
+            surface = null;
         }
 
         /**
@@ -522,15 +644,15 @@ public class CameraManager implements Handler.Callback {
     }
 
     void onPreviewFrame(byte[] data) {
-        if (mListener != null && mCamera != null) {
-            mListener.onCameraFrame(data, null, null, mCamera.mPreviewFormat, mCamera.previewWidth,
+        if (mFrameListener != null && mCamera != null) {
+            mFrameListener.onCameraFrame(data, null, null, mCamera.mPreviewFormat, mCamera.previewWidth,
                 mCamera.previewHeight, false);
         }
     }
 
     void onPreviewFrame(byte[] srcY, byte[] srcU, byte[] srcV) {
-        if (mListener != null && mCamera != null) {
-            mListener.onCameraFrame(srcY, srcU, srcV, mCamera.mPreviewFormat, mCamera.previewWidth,
+        if (mFrameListener != null && mCamera != null) {
+            mFrameListener.onCameraFrame(srcY, srcU, srcV, mCamera.mPreviewFormat, mCamera.previewWidth,
                 mCamera.previewHeight, true);
         }
     }

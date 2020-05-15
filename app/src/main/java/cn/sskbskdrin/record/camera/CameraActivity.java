@@ -1,113 +1,164 @@
 package cn.sskbskdrin.record.camera;
 
-import android.graphics.Bitmap;
+import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
+import android.view.Window;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
-import android.widget.ImageView;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
 import cn.sskbskdrin.lib.yuv.YUVCache;
 import cn.sskbskdrin.record.R;
-import cn.sskbskdrin.record.YUV;
 
-public class CameraActivity extends BaseActivity implements SurfaceHolder.Callback {
+public class CameraActivity extends BaseActivity {
     private static final String TAG = "MainActivity";
 
-    private CameraManager cameraManager = new CameraManager();
-    private ImageView imageView;
-    private SurfaceView view;
+    private CameraManager cameraManager;
+    private SurfaceView surfaceView;
+    private TextureView textureView;
     private DrawSurface drawView;
     AtomicBoolean isCut = new AtomicBoolean(false);
 
     private boolean v2;
     private boolean front;
+    private boolean texture;
     YUVCache factory = new YUVCache();
 
-    CameraManager.CameraListener listener = new CameraManager.CameraListener() {
-        @Override
-        public void onCameraStarted(int width, int height) {
-        }
-
-        @Override
-        public void onCameraStopped() {
-
-        }
-
+    CameraManager.CameraFrameListener listener = new CameraManager.CameraFrameListener() {
         @Override
         public void onCameraFrame(byte[] bytes, byte[] uBytes, byte[] vBytes, int format, int width, int height,
                                   boolean v2) {
-            int rotate = cameraManager != null ? cameraManager.getOrientation() : 0;
+            Log.d(TAG, String.format("frame: bytes len=%d %dx%d format=%d", bytes.length, width, height, format));
+            int rotate = (cameraManager != null ? cameraManager.getOrientation() : 0) + (front ? 180 : 0);
             if (v2) {
-                drawView.send(factory.getBitmap(bytes, uBytes, vBytes, new int[]{205, 205, 300, 400}, width, height,
-                    rotate + (front ? 180 : 0), front));
+                drawView.send(factory.getBitmap(bytes, uBytes, vBytes, null, width, height, rotate, front));
             } else {
-                //                drawView.send(factory.getBitmap(bytes, width, height, format, rotate + (front ? 180
-                //                : 0), front));
-                long time = System.currentTimeMillis();
-                int[] pixels = YUV.NV21toARGB(bytes, width, height);
-                Log.d(TAG, "onCameraFrame: time=" + (System.currentTimeMillis() - time));
-                Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
-                drawView.send(bitmap);
+                drawView.send(factory.getBitmap(bytes, width, height, format, rotate, front));
             }
-        }
-
-        @Override
-        public void onCameraError() {
-
         }
     };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_camera);
-        view = findViewById(R.id.camera_surface);
-        cameraManager.init(this, view, false);
-        cameraManager.setCameraListener(listener);
-        imageView = findViewById(R.id.camera_img);
+        surfaceView = findViewById(R.id.camera_surface);
+        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                Log.i(TAG, "surfaceCreated: ");
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                Log.i(TAG, "surfaceDestroyed: ");
+            }
+        });
         drawView = findViewById(R.id.draw_surface);
 
-        ((CheckBox) findViewById(R.id.camera_check)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+        textureView = findViewById(R.id.camera_texture);
+        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                v2 = isChecked;
-                change();
+            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                Log.i(TAG, "onSurfaceTextureAvailable: ");
+                //                if (cameraManager == null) {
+                //                    cameraManager = new CameraManager();
+                //                    cameraManager.init(CameraActivity.this, surface, width, height, v2);
+                //                    cameraManager.setEnabled(true);
+                //                }
+            }
+
+            @Override
+            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+                Log.i(TAG, "onSurfaceTextureSizeChanged: ");
+            }
+
+            @Override
+            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+                Log.i(TAG, "onSurfaceTextureDestroyed: ");
+                if (cameraManager != null) {
+                    cameraManager.release();
+                }
+                cameraManager = null;
+                return false;
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+                Log.i(TAG, "onSurfaceTextureUpdated: ");
             }
         });
 
-        ((CheckBox) findViewById(R.id.camera_id)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+        CompoundButton.OnCheckedChangeListener changeListener = new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                front = isChecked;
+                if (buttonView.getId() == R.id.camera_version) {
+                    v2 = isChecked;
+                } else if (buttonView.getId() == R.id.camera_id) {
+                    front = isChecked;
+                } else if (buttonView.getId() == R.id.camera_view_id) {
+                    texture = isChecked;
+                }
+                if (cameraManager != null) {
+                    cameraManager.release();
+                }
+                reset();
                 change();
             }
-        });
+        };
 
-        view.getHolder().addCallback(this);
-        findViewById(R.id.camera_next).setOnClickListener(new View.OnClickListener() {
+        ((CheckBox) findViewById(R.id.camera_version)).setOnCheckedChangeListener(changeListener);
+        ((CheckBox) findViewById(R.id.camera_id)).setOnCheckedChangeListener(changeListener);
+        ((CheckBox) findViewById(R.id.camera_view_id)).setOnCheckedChangeListener(changeListener);
+    }
+
+    private void reset() {
+        surfaceView.getLayoutParams().width = -1;
+        surfaceView.getLayoutParams().height = -1;
+        surfaceView.requestLayout();
+
+        textureView.getLayoutParams().width = -1;
+        textureView.getLayoutParams().height = -1;
+        textureView.requestLayout();
+        drawView.postDelayed(new Runnable() {
             @Override
-            public void onClick(View v) {
-                isCut.set(true);
+            public void run() {
+                change();
             }
-        });
+        }, 200);
     }
 
     private void change() {
-        cameraManager.release();
-        cameraManager = null;
-
+        if (cameraManager != null) {
+            cameraManager.release();
+        }
         cameraManager = new CameraManager();
-        cameraManager.init(this, view, v2);
+        //        cameraManager.init(this, view, v2);
+        if (texture) {
+            textureView.setVisibility(View.VISIBLE);
+            cameraManager.init(this, textureView, v2);
+            surfaceView.setVisibility(View.INVISIBLE);
+        } else {
+            surfaceView.setVisibility(View.VISIBLE);
+            cameraManager.init(this, surfaceView, v2);
+            textureView.setVisibility(View.INVISIBLE);
+        }
+        cameraManager.setMaxFrameSize(1920, 1080);
         cameraManager.setCameraId(front ? CameraManager.CameraId.FRONT : CameraManager.CameraId.BACK);
-        cameraManager.setCameraListener(listener);
+        cameraManager.setCameraFrameListener(listener);
         cameraManager.setEnabled(true);
     }
 
@@ -115,35 +166,15 @@ public class CameraActivity extends BaseActivity implements SurfaceHolder.Callba
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "onResume: ");
-        //        cameraManager.setEnabled(true);
-        //        view.getHolder().setFixedSize(view.getMeasuredWidth(), view.getMeasuredHeight());
-        //        view.getHolder().setFixedSize(cameraManager.getPreviewWidth(), cameraManager.getPreviewHeight());
+        texture = true;
+        v2 = true;
+        reset();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        if (cameraManager != null) {
-            //            cameraManager.setEnabled(false);
-        }
-    }
-
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        if (cameraManager == null) {
-            cameraManager = new CameraManager();
-        }
-    }
-
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        if (cameraManager != null) {
-            cameraManager.setEnabled(true);
-        }
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.d(TAG, "onPause: ");
         if (cameraManager != null) {
             cameraManager.release();
         }

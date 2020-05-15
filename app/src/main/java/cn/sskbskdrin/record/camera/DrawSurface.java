@@ -70,6 +70,10 @@ public class DrawSurface extends View implements Handler.Callback {
     int width;
     int height;
 
+    Rect src;
+    Rect dest;
+    Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
     @Override
     protected void onDraw(Canvas canvas) {
         if (width == 0) {
@@ -78,7 +82,14 @@ public class DrawSurface extends View implements Handler.Callback {
         }
         canvas.drawColor(0);
         if (cacheBitmap != null) {
-            canvas.drawBitmap(cacheBitmap, 0, 0, null);
+            if (src == null || src.right != cacheBitmap.getWidth() || src.bottom != cacheBitmap.getHeight()) {
+                bitmapPaint.setAlpha(0xa0);
+                src = new Rect(0, 0, cacheBitmap.getWidth(), cacheBitmap.getHeight());
+
+                float scale = Math.max(src.right * 1f / width, src.bottom * 1f / height);
+                dest = new Rect(0, 0, (int) (src.right/ scale), (int) (src.bottom / scale));
+            }
+            canvas.drawBitmap(cacheBitmap, src, dest, bitmapPaint);
         }
         if (rectF != null) {
             canvas.drawRect(rectF, paint);

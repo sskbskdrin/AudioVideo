@@ -15,11 +15,11 @@ public class YUV {
 
     private static int color(byte Y, byte U, byte V) {
         int y = 0xff & Y;
-        int u = 0xff & U;
-        int v = 0xff & V;
-        int r = y + (int) (1.370705f * (v - 128));
-        int g = y - (int) (0.698001f * (v - 128) + 0.337633f * (u - 128));
-        int b = y + (int) (1.732446f * (u - 128));
+        int u = (0xff & U) - 128;
+        int v = (0xff & V) - 128;
+        int r = y + (int) (1.370705f * v);
+        int g = y - (int) (0.698001f * v + 0.337633f * u);
+        int b = y + (int) (1.732446f * u);
         r = clamp(r);
         g = clamp(g);
         b = clamp(b);
@@ -41,7 +41,7 @@ public class YUV {
         r = clampN(r >> 16);
         g = clampN(g >> 16);
         b = clampN(b >> 16);
-        return 0xff000000 | r << 16 | b << 8 | g;
+        return 0xff000000 | (r << 16) | (g << 8) | b;
     }
 
     private static int clampN(int v) {

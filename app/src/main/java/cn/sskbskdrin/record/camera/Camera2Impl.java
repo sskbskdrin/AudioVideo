@@ -2,7 +2,6 @@ package cn.sskbskdrin.record.camera;
 
 import android.content.Context;
 import android.graphics.ImageFormat;
-import android.graphics.Rect;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -87,7 +86,7 @@ public class Camera2Impl extends CameraManager.ICamera {
     @Override
     public boolean connectCamera() {
         CameraManager.Size size = getViewSize();
-        Log.d(TAG, "Initialize camera w=" + size.width + " h=" + size.height);
+        Log.d(TAG, "connectCamera camera w=" + size.width + " h=" + size.height);
         if (!openCamera()) return false;
         try {
             android.hardware.camera2.CameraManager manager = (android.hardware.camera2.CameraManager) mContext.get()
@@ -111,26 +110,6 @@ public class Camera2Impl extends CameraManager.ICamera {
                     mFpsRange = range;
                 }
             }
-
-            Size size1 = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE);
-            Log.d(TAG, "connectCamera: pixel size=" + size1);
-
-            float scaleW = size.width * 1f / size1.getWidth();
-            float scaleH = size.height * 1f / size1.getHeight();
-            int w = size1.getWidth();
-            int h = size1.getHeight();
-            if (scaleW > scaleH) {
-                h = (int) (size.height / scaleW);
-            } else {
-                w = (int) (size.width / scaleH);
-            }
-            clip = new Rect();
-            clip.left = (size1.getWidth() - w) >> 1;
-            clip.right = size1.getWidth() - clip.left;
-            clip.top = (size1.getHeight() - h) >> 1;
-            clip.bottom = size1.getHeight() - clip.top;
-            Log.d(TAG, "connectCamera: clip=" + clip);
-
         } catch (Exception e) {
             throw new RuntimeException("Interrupted while setCameraPreviewSize.", e);
         }
@@ -180,8 +159,6 @@ public class Camera2Impl extends CameraManager.ICamera {
         return false;
     }
 
-    private Rect clip;
-
     private void createCameraPreviewSession() {
         final int w = getViewSize().width, h = getViewSize().height;
         Log.i(TAG, "createCameraPreviewSession(" + w + "x" + h + ")");
@@ -196,31 +173,28 @@ public class Camera2Impl extends CameraManager.ICamera {
                 return;
             }
 
-            mImageReader = ImageReader.newInstance(previewWidth, previewHeight, ImageFormat.YUV_420_888, 2);
-            mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
-                @Override
-                public void onImageAvailable(ImageReader reader) {
-                    Image image = reader.acquireLatestImage();
-                    if (image == null) return;
-                    getBytesFromImage(image);
-                    image.close();
-                }
-            }, mManager.getWorkHandler());
-            Surface surface = mImageReader.getSurface();
-
             mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             List<Surface> list = new ArrayList<>();
-            mPreviewRequestBuilder.addTarget(surface);
-            list.add(surface);
 
-            if (getSurfaceView() != null) {
-                surface = getSurfaceView().getHolder().getSurface();
+            if (mManager.mFrameListener != null) {
+                mImageReader = ImageReader.newInstance(previewWidth, previewHeight, ImageFormat.YUV_420_888, 2);
+                mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+                    @Override
+                    public void onImageAvailable(ImageReader reader) {
+                        Image image = reader.acquireLatestImage();
+                        if (image == null) return;
+                        getBytesFromImage(image);
+                        image.close();
+                    }
+                }, mManager.getWorkHandler());
+                Surface surface = mImageReader.getSurface();
+
                 mPreviewRequestBuilder.addTarget(surface);
                 list.add(surface);
             }
 
-            if (surfaceTexture != null) {
-                surface = new Surface(surfaceTexture);
+            Surface surface = getSurface();
+            if (surface != null) {
                 mPreviewRequestBuilder.addTarget(surface);
                 list.add(surface);
             }

@@ -1,57 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F00">
+    android:background="#660">
 
     <SurfaceView
         android:id="@+id/camera_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_centerInParent="true" />
+        android:layout_gravity="center_horizontal" />
+
+    <TextureView
+        android:id="@+id/camera_texture"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center_horizontal" />
 
     <cn.sskbskdrin.record.camera.DrawSurface
         android:id="@+id/draw_surface"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <ImageView
-        android:id="@+id/camera_img"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="#8800"
-        android:scaleType="center" />
+        android:layout_height="match_parent"
+        android:visibility="invisible" />
 
     <CheckBox
-        android:id="@+id/camera_check"
+        android:id="@+id/camera_version"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentRight="true"
+        android:layout_gravity="right"
         android:layout_margin="5dp"
-        android:background="#80cccccc"
+        android:background="#a0cccccc"
         android:padding="5dp"
-        android:text="使用Camera2" />
+        android:text="V2" />
 
     <CheckBox
         android:id="@+id/camera_id"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentRight="true"
+        android:layout_gravity="right"
         android:layout_marginTop="45dp"
         android:layout_marginRight="5dp"
-        android:background="#80cccccc"
+        android:background="#a0cccccc"
         android:checked="false"
         android:padding="5dp"
         android:text="前摄" />
+
+    <CheckBox
+        android:id="@+id/camera_view_id"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="right"
+        android:layout_marginTop="85dp"
+        android:layout_marginRight="5dp"
+        android:background="#a0cccccc"
+        android:checked="false"
+        android:padding="5dp"
+        android:text="Texture" />
 
     <Button
         android:id="@+id/camera_next"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentBottom="true"
-        android:text="cut" />
+        android:text="cut"
+        android:visibility="gone" />
 
-
-</RelativeLayout>
+</FrameLayout>

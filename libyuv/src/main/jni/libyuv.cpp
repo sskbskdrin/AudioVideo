@@ -50,7 +50,7 @@ rotate, bool mirror, bool hasAlpha, bool NV21 = false) {
             clip[0] = width - clip[3] - clip[1];
             clip[1] = x;
         }
-        LOGD("libyuv", "rotate=%d %d,%d", rotate, clip[0], clip[1]);
+//        LOGD("libyuv", "rotate=%d %d,%d", rotate, clip[0], clip[1]);
         int w = clip[2];
         int h = clip[3];
         if (rotate % 180) {
@@ -69,7 +69,7 @@ rotate, bool mirror, bool hasAlpha, bool NV21 = false) {
         int uvw = (w + 1) >> 1;
         libyuv::I420Copy(y, width, u, (width + 1) >> 1, v, (width + 1) >> 1,
                          dy, w, du, uvw, dv, uvw, w, h);
-        LOGD("libyuv", "I420Copy");
+//        LOGD("libyuv", "I420Copy");
         width = w;
         height = h;
         swapP(s, d);
@@ -167,7 +167,6 @@ Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeByteToRGBA(JNIEnv *env, jclass type, jby
             swapP(du, dv);
         }
         libyuv::SplitUVPlane(y + width * height, 0, du, 0, dv, 0, len, 1);
-        LOGD("libyuv", "split");
         uint8_t *sy = src;
         uint8_t *su = sy + width * height;
         uint8_t *sv = sy + width * height + len;

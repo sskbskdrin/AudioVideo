@@ -5,9 +5,8 @@ import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.os.Build;
 import android.util.Log;
-import android.view.SurfaceView;
+import android.view.SurfaceHolder;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -98,7 +97,7 @@ class CameraImpl extends CameraManager.ICamera implements Camera.PreviewCallback
     @Override
     boolean connectCamera() {
         CameraManager.Size size = getViewSize();
-        Log.d(TAG, "Initialize camera w=" + size.width + " h=" + size.height);
+        Log.d(TAG, "connectCamera camera w=" + size.width + " h=" + size.height);
         if (size.width == 0 || size.height == 0) {
             return false;
         }
@@ -110,11 +109,13 @@ class CameraImpl extends CameraManager.ICamera implements Camera.PreviewCallback
         List<Camera.Size> sizes = params.getSupportedPreviewSizes();
 
         /* Image format NV21 causes issues in the Android emulators */
-        if (Build.FINGERPRINT.startsWith("generic") || Build.FINGERPRINT.startsWith("unknown") || Build.MODEL.contains("google_sdk") || Build.MODEL.contains("Emulator") || Build.MODEL.contains("Android " + "SDK built for x86") || Build.MANUFACTURER.contains("Genymotion") || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")) || "google_sdk".equals(Build.PRODUCT))
+        if (Build.FINGERPRINT.startsWith("generic") || Build.FINGERPRINT.startsWith("unknown") || Build.MODEL.contains("google_sdk") || Build.MODEL
+            .contains("Emulator") || Build.MODEL.contains("Android " + "SDK built for x86") || Build.MANUFACTURER.contains("Genymotion") || (Build.BRAND
+            .startsWith("generic") && Build.DEVICE.startsWith("generic")) || "google_sdk".equals(Build.PRODUCT))
             params.setPreviewFormat(ImageFormat.YV12);  // "generic" or "android" = android emulator
         else params.setPreviewFormat(ImageFormat.NV21);
-//                params.setPreviewFormat(ImageFormat.YV12);
-                params.setPreviewFormat(ImageFormat.NV21);
+        //                params.setPreviewFormat(ImageFormat.YV12);
+        params.setPreviewFormat(ImageFormat.NV21);
         List<Integer> supportedPreviewFormats = params.getSupportedPreviewFormats();
         Log.d(TAG, "support format: " + Arrays.toString(supportedPreviewFormats.toArray()));
 
@@ -156,14 +157,15 @@ class CameraImpl extends CameraManager.ICamera implements Camera.PreviewCallback
             mCamera.addCallbackBuffer(mBuffer);
             mCamera.setPreviewCallbackWithBuffer(this);
 
-            SurfaceView view = getSurfaceView();
-            if (view != null) {
-                mCamera.setPreviewDisplay(view.getHolder());
+            SurfaceHolder holder = getSurfaceHolder();
+            if (holder != null) {
+                mCamera.setPreviewDisplay(holder);
             } else {
-                if (surfaceTexture != null) {
-                    surfaceTexture = new SurfaceTexture(MAGIC_TEXTURE_ID);
+                SurfaceTexture texture = getSurfaceTexture();
+                if (texture == null) {
+                    texture = surfaceTexture = new SurfaceTexture(MAGIC_TEXTURE_ID);
                 }
-                mCamera.setPreviewTexture(surfaceTexture);
+                mCamera.setPreviewTexture(texture);
             }
             Log.d(TAG, "startPreview w=" + previewWidth + " h=" + previewHeight);
             mCamera.startPreview();
@@ -179,13 +181,6 @@ class CameraImpl extends CameraManager.ICamera implements Camera.PreviewCallback
             mCamera.addCallbackBuffer(null);
             mCamera.setPreviewCallback(null);
             mCamera.setPreviewCallbackWithBuffer(null);
-            try {
-                if (surfaceTexture != null) {
-                    mCamera.setPreviewTexture(null);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
             mCamera.release();
             mCamera = null;
             mBuffer = null;

@@ -1,5 +1,8 @@
 package cn.sskbskdrin.record.camera;
 
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.util.Log;
@@ -14,6 +17,8 @@ import android.widget.CompoundButton;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
+import cn.sskbskdrin.lib.face.FaceDetector;
+import cn.sskbskdrin.lib.face.FaceLandmarker;
 import cn.sskbskdrin.lib.yuv.YUVCache;
 import cn.sskbskdrin.record.R;
 
@@ -30,6 +35,9 @@ public class CameraActivity extends BaseActivity {
     private boolean front;
     private boolean texture;
     YUVCache factory = new YUVCache();
+    FaceDetector detector;
+    FaceLandmarker landmarker;
+    int[] faceRect;
 
     CameraManager.CameraFrameListener listener = new CameraManager.CameraFrameListener() {
         @Override
@@ -40,8 +48,27 @@ public class CameraActivity extends BaseActivity {
             if (v2) {
                 drawView.send(factory.getBitmap(bytes, uBytes, vBytes, null, width, height, rotate, front));
             } else {
-                drawView.send(factory.getBitmap(bytes, width, height, format, rotate, front));
+                drawView.send(convert(factory.getBitmap(bytes, width, height, format, rotate, front),
+                    Bitmap.Config.RGB_565));
+                factory.transformRGBA(bytes, null, width, height, format, rotate, false, false);
+                if (detector == null) {
+                    detector = new FaceDetector(CameraActivity.this);
+                    faceRect = new int[8];
+                    landmarker = new FaceLandmarker(CameraActivity.this);
+                }
+                drawView.drawRect(faceRect, 0xfff00000);
+                detector.detect(factory.getRGBA(), height, width, faceRect, 1);
+                //                landmarker.mark(factory.getRGBA(), height, width, , faceRect, 1);
             }
+        }
+
+        private Bitmap convert(Bitmap bitmap, Bitmap.Config config) {
+            Bitmap convertedBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), config);
+            Canvas canvas = new Canvas(convertedBitmap);
+            Paint paint = new Paint();
+            //            paint.setColor(Color.BLACK);
+            canvas.drawBitmap(bitmap, 0, 0, null);
+            return convertedBitmap;
         }
     };
 
@@ -127,7 +154,7 @@ public class CameraActivity extends BaseActivity {
 
     private void reset() {
         surfaceView.getLayoutParams().width = -1;
-        surfaceView.getLayoutParams().height = -1;
+        surfaceView.getLayoutParams().height = 1440;
         surfaceView.requestLayout();
 
         textureView.getLayoutParams().width = -1;
@@ -156,7 +183,7 @@ public class CameraActivity extends BaseActivity {
             cameraManager.init(this, surfaceView, v2);
             textureView.setVisibility(View.INVISIBLE);
         }
-        cameraManager.setMaxFrameSize(1920, 1080);
+        cameraManager.setMaxFrameSize(640, 480);
         cameraManager.setCameraId(front ? CameraManager.CameraId.FRONT : CameraManager.CameraId.BACK);
         cameraManager.setCameraFrameListener(listener);
         cameraManager.setEnabled(true);
@@ -166,8 +193,8 @@ public class CameraActivity extends BaseActivity {
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "onResume: ");
-        texture = true;
-        v2 = true;
+        //        texture = true;
+        //        v2 = true;
         reset();
     }
 

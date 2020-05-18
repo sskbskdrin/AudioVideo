@@ -298,3 +298,18 @@ width, jboolean reverse) {
     env->ReleaseByteArrayElements(rgb_, (jbyte *) rgb, 0);
     env->ReleaseByteArrayElements(rgba_, (jbyte *) rgba, 0);
 }
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_cn_sskbskdrin_lib_yuv_YUVLib_nativeRGB565ToRGBA(JNIEnv *env, jclass clazz, jbyteArray argb_, jbyteArray rgb565_,
+                                                     jint width, jboolean reverse) {
+    uint8_t *rgb565 = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(rgb565_, NULL));
+    uint8_t *rgba = reinterpret_cast<uint8_t *>(env->GetByteArrayElements(argb_, NULL));
+    if (reverse) {
+        libyuv::ARGBToRGB565(rgba, width * 4, rgb565, width * 2, width, 1);
+    } else {
+        libyuv::RGB565ToARGB(rgb565, width * 2, rgba, width * 4, width, 1);
+    }
+    env->ReleaseByteArrayElements(rgb565_, (jbyte *) rgb565, 0);
+    env->ReleaseByteArrayElements(argb_, (jbyte *) rgba, 0);
+}

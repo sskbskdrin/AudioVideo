@@ -58,6 +58,11 @@ public class YUVCache {
         }
     }
 
+    public byte[] getCache(int size) {
+        checkCache(size);
+        return cache;
+    }
+
     /**
      * 转化成RGBA
      *

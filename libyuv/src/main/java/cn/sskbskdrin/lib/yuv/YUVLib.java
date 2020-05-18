@@ -177,6 +177,10 @@ public class YUVLib {
         nativeRGBToRGBA(rgb, rgba, size, reverse);
     }
 
+    public static void RGB565ToRGBA(byte[] rgb565, byte[] rgba, int size, boolean reverse) {
+        nativeRGB565ToRGBA(rgb565, rgba, size, reverse);
+    }
+
     public static void RGBAToColor(byte[] src, int[] colors, int srcSize) {
         nativeBGRAToColor(src, colors, srcSize);
     }
@@ -197,4 +201,6 @@ public class YUVLib {
                                                int dHeight, int quality);
 
     private static native void nativeRGBToRGBA(byte[] rgb, byte[] rgba, int size, boolean reverse);
+
+    private static native void nativeRGB565ToRGBA(byte[] rgb565, byte[] rgba, int size, boolean reverse);
 }

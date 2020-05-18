@@ -47,4 +47,5 @@ dependencies {
     implementation 'cn.sskbskdrin:ssk-base:0.1.0'
     implementation 'com.android.support:support-fragment:28.0.0'
     implementation project(path: ':libyuv')
+    implementation project(path: ':libface')
 }

@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
+import android.util.SparseArray;
 import android.view.View;
 
 /**
@@ -18,6 +19,9 @@ import android.view.View;
  * @author sskbskdrin
  */
 public class DrawSurface extends View implements Handler.Callback {
+    private static final String TAG = "DrawSurface";
+    SparseArray<Action> map = new SparseArray<>();
+
     public DrawSurface(Context context) {
         this(context, null);
     }
@@ -53,7 +57,6 @@ public class DrawSurface extends View implements Handler.Callback {
     }
 
     public void send(Bitmap bitmap) {
-        //        workThread.send(0, bitmap);
         cacheBitmap = bitmap;
         postInvalidate();
     }
@@ -87,23 +90,225 @@ public class DrawSurface extends View implements Handler.Callback {
                 src = new Rect(0, 0, cacheBitmap.getWidth(), cacheBitmap.getHeight());
 
                 float scale = Math.max(src.right * 1f / width, src.bottom * 1f / height);
-                dest = new Rect(0, 0, (int) (src.right/ scale), (int) (src.bottom / scale));
+                dest = new Rect(0, 0, (int) (src.right / scale), (int) (src.bottom / scale));
             }
-            canvas.drawBitmap(cacheBitmap, src, dest, bitmapPaint);
+            canvas.drawBitmap(cacheBitmap, src, dest, null);
         }
         if (rectF != null) {
             canvas.drawRect(rectF, paint);
+        }
+        for (int i = 0; i < map.size(); i++) {
+            Action action = map.valueAt(i);
+            if (action != null) {
+                action.draw(canvas);
+            }
         }
     }
 
     @Override
     public boolean handleMessage(Message msg) {
         cacheBitmap = (Bitmap) msg.obj;
-        //        Canvas canvas = getHolder().lockCanvas();
-        //        canvas.drawColor(0);
-        //        canvas.drawBitmap(cacheBitmap, 0, 0, null);
-        //        getHolder().unlockCanvasAndPost(canvas);
         return true;
+    }
+
+    public int addAction(Action action) {
+        map.put(action.id, action);
+        return action.id;
+    }
+
+    public int drawBitmap(Bitmap bitmap, int x, int y) {
+        Action action = new BitmapAction(bitmap, x, y);
+        addAction(action);
+        return action.id;
+    }
+
+    public int drawBitmap(int id, Bitmap bitmap, int x, int y) {
+        Action action = new BitmapAction(id, bitmap, x, y);
+        addAction(action);
+        postInvalidate();
+        return action.id;
+    }
+
+    public void drawPoint(float x, float y, int color) {
+        drawPoints(new float[]{x, y}, color);
+        postInvalidate();
+    }
+
+    public void drawPoints(float[] points, int color) {
+        //        addAction(new PointAction(points));
+        postInvalidate();
+    }
+
+    public void drawPoints(double[] points, int color) {
+        //        addAction(new PointAction(tr(points)));
+        postInvalidate();
+    }
+
+    public void drawLine(float x1, float y1, float x2, float y2, int color) {
+        addAction(new LineAction(color, x1, y1, x2, y2));
+        postInvalidate();
+    }
+
+    public void drawRect(int[] rect, int color) {
+        addAction(new RectAction(color, tr(rect)));
+    }
+
+    public void drawLines(int[] points, int color) {
+        addAction(new LineAction(color, tr(points)));
+        postInvalidate();
+    }
+
+    public void drawLines(int id, int[] points, int color) {
+        addAction(new LineAction(id, color, tr(points)));
+        postInvalidate();
+    }
+
+    public interface DrawListener {
+        void draw(Action action);
+    }
+
+    private static Float[] tr(int[] arr) {
+        Float[] ret = new Float[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            ret[i] = (float) arr[i];
+        }
+        return ret;
+    }
+
+    private static Float[] tr(double[] arr) {
+        Float[] ret = new Float[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            ret[i] = (float) arr[i];
+        }
+        return ret;
+    }
+
+    public static abstract class Action<T> {
+        private static int count = 0;
+        protected T[] params;
+        protected Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        private final int id;
+
+        private Action() {
+            id = -1;
+        }
+
+        Action(T... p) {
+            params = p;
+            paint.setColor(Color.CYAN);
+            id = ++count;
+        }
+
+        Action(int color, T... p) {
+            paint.setColor(color);
+            params = p;
+            id = ++count;
+        }
+
+        Action(int color, int id, T... p) {
+            paint.setColor(color);
+            params = p;
+            this.id = id;
+        }
+
+        public abstract void draw(Canvas canvas);
+    }
+
+    private static class PointAction extends Action<Float> {
+        PointAction(Float[] p) {
+            super(p);
+        }
+
+        PointAction(int color, Float[] p) {
+            super(color, p);
+        }
+
+        int[] color;
+
+        PointAction(int[] color, Float p) {
+            super(p);
+            this.color = color;
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            if (params == null || params.length == 0) return;
+
+            paint.setStyle(Paint.Style.FILL);
+            for (int i = 0; i < params.length; i += 2) {
+                if (color != null) {
+                    paint.setColor(color[i / 2]);
+                }
+                canvas.drawCircle(params[i], params[i + 1], 1, paint);
+            }
+        }
+    }
+
+    private static class LineAction extends Action<Float> {
+        LineAction(Float... p) {
+            super(p);
+        }
+
+        LineAction(int color, Float... p) {
+            super(color, p);
+        }
+
+        LineAction(int id, int color, Float... p) {
+            super(color, id, p);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            if (params == null || params.length == 0) return;
+
+            paint.setStrokeWidth(2);
+            int i = 0;
+            for (; i < params.length - 3; i += 2) {
+                canvas.drawLine(params[i], params[i + 1], params[i + 2], params[i + 3], paint);
+            }
+            canvas.drawLine(params[i], params[i + 1], params[0], params[1], paint);
+        }
+    }
+
+    private static class BitmapAction extends Action<Bitmap> {
+        int left;
+        int top;
+
+        BitmapAction(int id, Bitmap bitmap, int x, int y) {
+            super(0, id, bitmap);
+            left = x;
+            top = y;
+        }
+
+        BitmapAction(Bitmap bitmap, int x, int y) {
+            super(bitmap);
+            left = x;
+            top = y;
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            if (params != null && params.length > 0) {
+                canvas.drawBitmap(params[0], left, top, null);
+            }
+        }
+    }
+
+    private static class RectAction extends Action<Float> {
+
+        RectAction(int color, Float... rect) {
+            super(color, rect);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            if (params != null) {
+                for (int i = 0; i < params.length / 4; i++) {
+                    canvas.drawRect(params[0], params[1], params[0] + params[2], params[1] + params[3], paint);
+                }
+            }
+        }
     }
 
     public enum AlignMode {

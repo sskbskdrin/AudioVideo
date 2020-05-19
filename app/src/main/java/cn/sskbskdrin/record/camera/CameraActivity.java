@@ -1,12 +1,9 @@
 package cn.sskbskdrin.record.camera;
 
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Paint;
+import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
@@ -14,12 +11,14 @@ import android.view.Window;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.sskbskdrin.base.BaseActivity;
 import cn.sskbskdrin.lib.face.FaceDetector;
 import cn.sskbskdrin.lib.face.FaceLandmarker;
 import cn.sskbskdrin.lib.yuv.YUVCache;
+import cn.sskbskdrin.lib.yuv.YUVLib;
 import cn.sskbskdrin.record.R;
 
 public class CameraActivity extends BaseActivity {
@@ -38,6 +37,7 @@ public class CameraActivity extends BaseActivity {
     FaceDetector detector;
     FaceLandmarker landmarker;
     int[] faceRect;
+    double[] points;
 
     CameraManager.CameraFrameListener listener = new CameraManager.CameraFrameListener() {
         @Override
@@ -45,30 +45,25 @@ public class CameraActivity extends BaseActivity {
                                   boolean v2) {
             Log.d(TAG, String.format("frame: bytes len=%d %dx%d format=%d", bytes.length, width, height, format));
             int rotate = (cameraManager != null ? cameraManager.getOrientation() : 0) + (front ? 180 : 0);
+            drawView.setSrcFrame(height, width);
             if (v2) {
-                drawView.send(factory.getBitmap(bytes, uBytes, vBytes, null, width, height, rotate, front));
+                drawView.drawBitmap(factory.getBitmap(bytes, uBytes, vBytes, width, height, rotate));
             } else {
-                drawView.send(convert(factory.getBitmap(bytes, width, height, format, rotate, front),
-                    Bitmap.Config.RGB_565));
                 factory.transformRGBA(bytes, null, width, height, format, rotate, false, false);
                 if (detector == null) {
                     detector = new FaceDetector(CameraActivity.this);
-                    faceRect = new int[8];
+                    faceRect = new int[40];
                     landmarker = new FaceLandmarker(CameraActivity.this);
+                    points = new double[100];
                 }
-                drawView.drawRect(faceRect, 0xfff00000);
-                detector.detect(factory.getRGBA(), height, width, faceRect, 1);
-                //                landmarker.mark(factory.getRGBA(), height, width, , faceRect, 1);
+                int face = detector.detect(factory.getRGBA(), height, width, faceRect, 10);
+                drawView.drawRect(faceRect, 0xffe00000);
+                if (face > 0) {
+                    landmarker.mark(factory.getRGBA(), height, width, points, faceRect, face);
+                }
+                drawView.drawPoints(points, Color.GREEN);
+                Log.i(TAG, "faceRect: " + Arrays.toString(points));
             }
-        }
-
-        private Bitmap convert(Bitmap bitmap, Bitmap.Config config) {
-            Bitmap convertedBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), config);
-            Canvas canvas = new Canvas(convertedBitmap);
-            Paint paint = new Paint();
-            //            paint.setColor(Color.BLACK);
-            canvas.drawBitmap(bitmap, 0, 0, null);
-            return convertedBitmap;
         }
     };
 
@@ -77,23 +72,8 @@ public class CameraActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_camera);
+        YUVLib.init();
         surfaceView = findViewById(R.id.camera_surface);
-        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
-            @Override
-            public void surfaceCreated(SurfaceHolder holder) {
-                Log.i(TAG, "surfaceCreated: ");
-            }
-
-            @Override
-            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-
-            }
-
-            @Override
-            public void surfaceDestroyed(SurfaceHolder holder) {
-                Log.i(TAG, "surfaceDestroyed: ");
-            }
-        });
         drawView = findViewById(R.id.draw_surface);
 
         textureView = findViewById(R.id.camera_texture);
@@ -138,6 +118,10 @@ public class CameraActivity extends BaseActivity {
                     front = isChecked;
                 } else if (buttonView.getId() == R.id.camera_view_id) {
                     texture = isChecked;
+                } else if (buttonView.getId() == R.id.camera_draw) {
+                    drawView.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+                    drawView.clean();
+                    return;
                 }
                 if (cameraManager != null) {
                     cameraManager.release();
@@ -150,6 +134,7 @@ public class CameraActivity extends BaseActivity {
         ((CheckBox) findViewById(R.id.camera_version)).setOnCheckedChangeListener(changeListener);
         ((CheckBox) findViewById(R.id.camera_id)).setOnCheckedChangeListener(changeListener);
         ((CheckBox) findViewById(R.id.camera_view_id)).setOnCheckedChangeListener(changeListener);
+        ((CheckBox) findViewById(R.id.camera_draw)).setOnCheckedChangeListener(changeListener);
     }
 
     private void reset() {

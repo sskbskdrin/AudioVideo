@@ -14,16 +14,6 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG , "Seeta", __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN , "Seeta", __VA_ARGS__)
 
-class ImageData : public SeetaImageData {
-public:
-    ImageData(int w, int h, int c, unsigned char *d) {
-        width = w;
-        height = h;
-        channels = c;
-        data = d;
-    }
-};
-
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_cn_sskbskdrin_lib_face_FaceDetector_nativeInitDetection(JNIEnv *env, jclass clazz, jstring detect_model_file) {
@@ -56,12 +46,11 @@ Java_cn_sskbskdrin_lib_face_FaceDetector_nativeDetection(JNIEnv *env, jclass cla
     if (rect_) {
         rect = env->GetIntArrayElements(rect_, NULL);
     }
-    ImageData image(width, height, 3, src);
-//    image.data = src;
 
-    LOGD("start detect");
+    seeta::ImageData image(width, height, 3);
+    image.data = src;
+
     SeetaFaceInfoArray faces = engine->detect(image);
-    LOGD("end detect");
 
     int rectIndex = 0;
     for (int i = 0; i < faces.size && i < max_face_count; ++i) {

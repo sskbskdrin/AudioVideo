@@ -6,7 +6,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
@@ -56,47 +55,39 @@ public class DrawSurface extends View implements Handler.Callback {
         workThread = null;
     }
 
+    float srcWidth;
+    float srcHeight;
+
+    public void setSrcFrame(int width, int height) {
+        srcWidth = width;
+        srcHeight = height;
+    }
+
     public void send(Bitmap bitmap) {
         cacheBitmap = bitmap;
         postInvalidate();
     }
 
-    public void send(RectF rect) {
-        rectF.left = rect.left * width;
-        rectF.top = rect.top * height;
-        rectF.right = rect.right * width;
-        rectF.bottom = rect.bottom * height;
-        postInvalidate();
-    }
-
-    private RectF rectF = new RectF();
-    int width;
-    int height;
-
-    Rect src;
-    Rect dest;
     Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if (width == 0) {
-            width = getMeasuredWidth();
-            height = getMeasuredHeight();
-        }
         canvas.drawColor(0);
-        if (cacheBitmap != null) {
-            if (src == null || src.right != cacheBitmap.getWidth() || src.bottom != cacheBitmap.getHeight()) {
-                bitmapPaint.setAlpha(0xa0);
-                src = new Rect(0, 0, cacheBitmap.getWidth(), cacheBitmap.getHeight());
+        //        if (cacheBitmap != null) {
+        //            if (src == null || src.right != cacheBitmap.getWidth() || src.bottom != cacheBitmap.getHeight()) {
+        //                bitmapPaint.setAlpha(0xa0);
+        //                src = new Rect(0, 0, cacheBitmap.getWidth(), cacheBitmap.getHeight());
+        //
+        //                float scale = Math.max(src.right * 1f / width, src.bottom * 1f / height);
+        //                dest = new Rect(0, 0, (int) (src.right / scale), (int) (src.bottom / scale));
+        //            }
+        //            canvas.drawBitmap(cacheBitmap, src, dest, null);
+        //        }
+        //        if (rectF != null) {
+        //            canvas.drawRect(rectF, paint);
+        //        }
 
-                float scale = Math.max(src.right * 1f / width, src.bottom * 1f / height);
-                dest = new Rect(0, 0, (int) (src.right / scale), (int) (src.bottom / scale));
-            }
-            canvas.drawBitmap(cacheBitmap, src, dest, null);
-        }
-        if (rectF != null) {
-            canvas.drawRect(rectF, paint);
-        }
+        canvas.scale(getWidth() / srcWidth, getWidth() / srcWidth);
         for (int i = 0; i < map.size(); i++) {
             Action action = map.valueAt(i);
             if (action != null) {
@@ -111,55 +102,49 @@ public class DrawSurface extends View implements Handler.Callback {
         return true;
     }
 
-    public int addAction(Action action) {
+    public void clean() {
+        map.clear();
+    }
+
+    private int addAction(Action action) {
         map.put(action.id, action);
         return action.id;
     }
 
-    public int drawBitmap(Bitmap bitmap, int x, int y) {
-        Action action = new BitmapAction(bitmap, x, y);
-        addAction(action);
-        return action.id;
+    public void drawBitmap(Bitmap bitmap) {
+        drawBitmap(bitmap, 0, 0);
     }
 
-    public int drawBitmap(int id, Bitmap bitmap, int x, int y) {
-        Action action = new BitmapAction(id, bitmap, x, y);
+    public void drawBitmap(Bitmap bitmap, int x, int y) {
+        Action action = new BitmapAction(bitmap.hashCode(), bitmap, x, y);
         addAction(action);
         postInvalidate();
-        return action.id;
     }
 
     public void drawPoint(float x, float y, int color) {
-        drawPoints(new float[]{x, y}, color);
-        postInvalidate();
-    }
-
-    public void drawPoints(float[] points, int color) {
-        //        addAction(new PointAction(points));
-        postInvalidate();
+        drawPoints((x + "x" + y).hashCode(), color, 3, new float[]{x, y});
     }
 
     public void drawPoints(double[] points, int color) {
-        //        addAction(new PointAction(tr(points)));
-        postInvalidate();
+        drawPoints(points.hashCode(), color, 2, tr(points));
     }
 
-    public void drawLine(float x1, float y1, float x2, float y2, int color) {
-        addAction(new LineAction(color, x1, y1, x2, y2));
+    public void drawPoints(float[] points, int color) {
+        drawPoints(points.hashCode(), color, 2, points);
+    }
+
+    private void drawPoints(int id, int color, float radius, float[] points) {
+        addAction(new PointAction(id, color, radius, points));
         postInvalidate();
     }
 
     public void drawRect(int[] rect, int color) {
-        addAction(new RectAction(color, tr(rect)));
-    }
-
-    public void drawLines(int[] points, int color) {
-        addAction(new LineAction(color, tr(points)));
+        addAction(new RectAction(rect.hashCode(), color, tr(rect)));
         postInvalidate();
     }
 
-    public void drawLines(int id, int[] points, int color) {
-        addAction(new LineAction(id, color, tr(points)));
+    public void drawLines(int color, int... points) {
+        addAction(new LineAction(points.hashCode(), color, tr(points)));
         postInvalidate();
     }
 
@@ -167,16 +152,16 @@ public class DrawSurface extends View implements Handler.Callback {
         void draw(Action action);
     }
 
-    private static Float[] tr(int[] arr) {
-        Float[] ret = new Float[arr.length];
+    private static float[] tr(int[] arr) {
+        float[] ret = new float[arr.length];
         for (int i = 0; i < arr.length; i++) {
             ret[i] = (float) arr[i];
         }
         return ret;
     }
 
-    private static Float[] tr(double[] arr) {
-        Float[] ret = new Float[arr.length];
+    private static float[] tr(double[] arr) {
+        float[] ret = new float[arr.length];
         for (int i = 0; i < arr.length; i++) {
             ret[i] = (float) arr[i];
         }
@@ -185,7 +170,7 @@ public class DrawSurface extends View implements Handler.Callback {
 
     public static abstract class Action<T> {
         private static int count = 0;
-        protected T[] params;
+        protected T params;
         protected Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         private final int id;
@@ -194,19 +179,19 @@ public class DrawSurface extends View implements Handler.Callback {
             id = -1;
         }
 
-        Action(T... p) {
+        Action(T p) {
             params = p;
             paint.setColor(Color.CYAN);
             id = ++count;
         }
 
-        Action(int color, T... p) {
+        Action(int color, T p) {
             paint.setColor(color);
             params = p;
             id = ++count;
         }
 
-        Action(int color, int id, T... p) {
+        Action(int id, int color, T p) {
             paint.setColor(color);
             params = p;
             this.id = id;
@@ -215,47 +200,41 @@ public class DrawSurface extends View implements Handler.Callback {
         public abstract void draw(Canvas canvas);
     }
 
-    private static class PointAction extends Action<Float> {
-        PointAction(Float[] p) {
-            super(p);
-        }
+    private static class PointAction extends Action<float[]> {
+        float radius = 2;
 
-        PointAction(int color, Float[] p) {
+        PointAction(int color, float radius, float[] p) {
             super(color, p);
+            this.radius = radius;
         }
 
-        int[] color;
-
-        PointAction(int[] color, Float p) {
-            super(p);
-            this.color = color;
+        PointAction(int id, int color, float radius, float[] p) {
+            super(id, color, p);
+            this.radius = radius;
         }
 
         @Override
         public void draw(Canvas canvas) {
-            if (params == null || params.length == 0) return;
+            if (params == null) return;
 
             paint.setStyle(Paint.Style.FILL);
             for (int i = 0; i < params.length; i += 2) {
-                if (color != null) {
-                    paint.setColor(color[i / 2]);
-                }
-                canvas.drawCircle(params[i], params[i + 1], 1, paint);
+                canvas.drawCircle(params[i], params[i + 1], radius, paint);
             }
         }
     }
 
-    private static class LineAction extends Action<Float> {
-        LineAction(Float... p) {
+    private static class LineAction extends Action<float[]> {
+        LineAction(float[] p) {
             super(p);
         }
 
-        LineAction(int color, Float... p) {
+        LineAction(int color, float[] p) {
             super(color, p);
         }
 
-        LineAction(int id, int color, Float... p) {
-            super(color, id, p);
+        LineAction(int id, int color, float[] p) {
+            super(id, color, p);
         }
 
         @Override
@@ -276,7 +255,7 @@ public class DrawSurface extends View implements Handler.Callback {
         int top;
 
         BitmapAction(int id, Bitmap bitmap, int x, int y) {
-            super(0, id, bitmap);
+            super(id, 0, bitmap);
             left = x;
             top = y;
         }
@@ -289,23 +268,32 @@ public class DrawSurface extends View implements Handler.Callback {
 
         @Override
         public void draw(Canvas canvas) {
-            if (params != null && params.length > 0) {
-                canvas.drawBitmap(params[0], left, top, null);
+            if (params != null) {
+                canvas.drawBitmap(params, left, top, null);
             }
         }
     }
 
-    private static class RectAction extends Action<Float> {
+    private static class RectAction extends Action<float[]> {
 
-        RectAction(int color, Float... rect) {
+        RectAction(int color, float[] rect) {
             super(color, rect);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3);
+        }
+
+        RectAction(int id, int color, float[] rect) {
+            super(id, color, rect);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3);
         }
 
         @Override
         public void draw(Canvas canvas) {
             if (params != null) {
-                for (int i = 0; i < params.length / 4; i++) {
-                    canvas.drawRect(params[0], params[1], params[0] + params[2], params[1] + params[3], paint);
+                for (int i = 0; i < params.length - 3; i += 4) {
+                    canvas.drawRect(params[i], params[i + 1], params[i] + params[i + 2],
+                        params[i + 1] + params[i + 3], paint);
                 }
             }
         }

@@ -1,6 +1,8 @@
 package cn.sskbskdrin.lib.yuv;
 
 import android.graphics.ImageFormat;
+import android.util.Log;
+import android.util.SparseArray;
 
 /**
  * @author sskbskdrin
@@ -86,35 +88,79 @@ public class YUVLib {
         }
     }
 
+    public static void init() {
+        r1 = new int[255];
+        g1 = new int[255];
+        g2 = new int[255];
+        b1 = new int[255];
+        for (int i = 0; i < 255; i++) {
+            r1[i] = (int) ((i - 128) * 1.370705);
+            g1[i] = (int) ((i - 128) * 0.698001);
+            g2[i] = (int) ((i - 128) * 0.337633);
+            b1[i] = (int) ((i - 128) * 1.732446);
+        }
+    }
+
+    static int[] r1;
+    static int[] g1, g2;
+    static int[] b1;
+
+    private static void colorT(byte Y, byte U, byte V, byte[] dest, int index) {
+        int y = 0xff & Y;
+        int u = 0xff & U;
+        int v = 0xff & V;
+        int r = y + r1[v];
+        int g = y - g1[v] - g2[u];
+        int b = y + b1[u];
+        dest[index] = (byte) clamp(r);
+        dest[index + 1] = (byte) clamp(g);
+        dest[index + 2] = (byte) clamp(b);
+        dest[index + 3] = (byte) 0xff;
+    }
+
     private static int color(byte Y, byte U, byte V) {
         int y = 0xff & Y;
-        int u = 0xff & U - 128;
-        int v = 0xff & V - 128;
+        int u = (0xff & U) - 128;
+        int v = (0xff & V) - 128;
         int y65535 = y << 16;// 0xffff=65535;
         int r = y65535 + 89829 * v;// 1.370705*0xffff=89829.15
-        int g = y65535 - 457435 * v + 22127 * u; // 0.698001*0xffff=45743.49 0.337633*0xffff=22126.78
+        int g = y65535 - 45743 * v - 22127 * u; // 0.698001*0xffff=45743.49 0.337633*0xffff=22126.78
         int b = y65535 + 113535 * u;// 1.732446*0x3fff=113535.85
-        r = clamp(r) >> 16;
-        g = clamp(g) >> 16;
-        b = clamp(b) >> 16;
+        r = clamp(r >> 16);
+        g = clamp(g >> 16);
+        b = clamp(b >> 16);
         return 0xff000000 | r << 16 | g << 8 | b;
     }
 
     private static int clamp(int v) {
-        return v < 65535 ? 65535 : (v > 0xffffff ? 0xffffff : v);
+        return v < 0 ? 0 : (v > 0xff ? 0xff : v);
     }
 
-    private static void yuv420spToARGB(byte[] src, int[] dest, int width, int height) {
+    public static void yuv420spToARGB(byte[] src, int[] dest, int width, int height) {
         int uv = width * height;
         for (int i = 0; i < height; i++) {
             int line = i * width;
             int index, uvIndex;
             for (int j = 0; j < width; j++) {
                 index = line + j;
-                uvIndex = uv + index >> 1;
+                uvIndex = uv + (i >> 1) * width + (j & 0xfffffffe);
                 dest[index] = color(src[index], src[uvIndex + 1], src[uvIndex]);
             }
         }
+    }
+
+    public static void I420ToARGB(byte[] y, byte[] u, byte[] v, byte[] dest, int width, int height) {
+        long st = System.currentTimeMillis();
+        for (int i = 0; i < height; i++) {
+            int line = i * width;
+            int uvIndex = (i >> 1) * (width >> 1);
+            for (int j = 0; j < width; j++) {
+                int index = line + j;
+                int uv = uvIndex + (j >> 1);
+                colorT(y[index], u[uv], v[uv], dest, index << 2);
+            }
+        }
+        Log.d(TAG, "I420ToARGB: time=" + (System.currentTimeMillis() - st));
     }
 
     /**

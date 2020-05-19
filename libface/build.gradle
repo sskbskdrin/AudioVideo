@@ -36,3 +36,15 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
+
+task makeJar(type: Jar) {
+    delete 'build/libs/ssk-http-0.0.2.jar'
+    from('build/intermediates/javac/debug/classes/cn/sskbskdrin/lib/face')
+    into 'cn/sskbskdrin/lib/face'
+    exclude('BuildConfig.class', 'R.class')
+}
+//    makeJar.dependsOn(build)
+
+artifacts {
+    archives makeJar
+}

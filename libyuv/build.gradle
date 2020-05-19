@@ -31,8 +31,24 @@ android {
             path "src/main/jni/CMakeLists.txt"
         }
     }
+    android.libraryVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "${project.name}-${buildTypes}-${variant.properties.versionName}.jar"
+        }
+    }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+}
+
+task makeJar(type: Jar) {
+    delete 'build/libs/libyuv.jar'
+    from('build/intermediates/javac/debug/classes/cn/sskbskdrin/lib/yuv')
+    into 'cn/sskbskdrin/lib/yuv'
+    exclude('BuildConfig.class', 'R.class')
+}
+
+artifacts {
+    archives makeJar
 }

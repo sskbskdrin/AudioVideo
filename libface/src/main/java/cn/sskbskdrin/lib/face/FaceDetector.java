@@ -8,6 +8,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 
 public class FaceDetector {
 
@@ -33,6 +34,7 @@ public class FaceDetector {
         if (rect.length < maxFaceCount * 4) {
             throw new IllegalArgumentException("rect size too small");
         }
+        Arrays.fill(rect, 0);
         long st = System.currentTimeMillis();
         int ret = nativeDetection(id, src, width, height, rect, maxFaceCount);
         if (LogUtil.isLoggable()) {

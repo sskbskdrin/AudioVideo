@@ -20,7 +20,7 @@
         android:id="@+id/draw_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="invisible" />
+        android:visibility="visible" />
 
     <CheckBox
         android:id="@+id/camera_version"
@@ -55,6 +55,18 @@
         android:checked="false"
         android:padding="5dp"
         android:text="Texture" />
+
+    <CheckBox
+        android:id="@+id/camera_draw"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="right"
+        android:layout_marginTop="125dp"
+        android:layout_marginRight="5dp"
+        android:background="#a0cccccc"
+        android:checked="false"
+        android:padding="5dp"
+        android:text="Draw" />
 
     <Button
         android:id="@+id/camera_next"

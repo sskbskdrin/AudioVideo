@@ -51,6 +51,9 @@ Java_cn_sskbskdrin_lib_face_FaceLandmarker_nativeMark(JNIEnv *env, jclass clazz,
             points[pointIndex++] = temp[j].y;
         }
     }
+    env->ReleaseByteArrayElements(src_, (jbyte *) src, 0);
+    env->ReleaseIntArrayElements(rect_, rect, 0);
+    env->ReleaseDoubleArrayElements(dest_points, points, 0);
     return face_count;
 }
 

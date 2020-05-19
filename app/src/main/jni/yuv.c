@@ -84,65 +84,64 @@ Java_cn_sskbskdrin_record_YUV_nativeRotateNV(JNIEnv *env, jclass type, jbyteArra
     return array;
 }
 
-uint8_t clamp(int v) {
+inline uint8_t clamp(int v) {
     return (uint8_t) (v < 0 ? 0 : (v > 255 ? 255 : v));
 }
 
-void color(uint8_t Y, uint8_t U, uint8_t V, uint8_t *r, uint8_t *g, uint8_t *b) {
+void color(uint8_t Y, uint8_t U, uint8_t V, uint8_t *dest) {
     int y = 0xff & Y;
-    int u = 0xff & U;
-    int v = 0xff & V;
-    *r = clamp(y + (int) (1.370705f * (v - 128)));
-    *g = clamp(y - (int) (0.698001f * (v - 128) + 0.337633f * (u - 128)));
-    *b = clamp(y + (int) (1.732446f * (u - 128)));
+    int u = (0xff & U) - 128;
+    int v = (0xff & V) - 128;
+    int y65535 = y << 16;// 0xffff=65535;
+    dest[2] = clamp((y65535 + 89829 * v) / 65535);
+    dest[1] = clamp((y65535 - 45743 * v - 22127 * u) / 65535);
+    dest[0] = clamp((y65535 + 113535 * u) / 65535);
+    dest[3] = 0xff;
 }
 
 void NV21ToArgb(uint8_t *src, uint8_t *dest, int width, int height, BOOL isNV12) {
-    uint8_t y, u, v;
     int index;
 
-    int size = width * height;
     for (int h = 0; h < height; h++) {
-        int line = width * (h / 2);
+        int line = width * h;
+        int uv = (h >> 1) * width;
         for (int w = 0; w < width; w++) {
-            index = (w % 2 == 0 ? w : w - 1) + line;
+            index = line + w;
+            int uvIndex = uv + (h >> 1) * width + (w & 0xfffffffe);
 
-            y = src[width * h + w];
-            if (isNV12) {
-                u = src[size + index];
-                v = src[size + index + 1];
-            } else {
-                u = src[size + index + 1];
-                v = src[size + index];
-            }
-            int off = (width * h + w) * 4;
-            color(y, u, v, dest + off, dest + off + 1, dest + off + 2);
-            dest[off + 3] = 0xff;
+            color(src[index], src[uvIndex + 1], src[uvIndex], dest + (index << 2));
+        }
+    }
+}
+
+void I420ToARGB(uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *dest, int width, int height) {
+    for (int i = 0; i < height; i++) {
+        int line = i * width;
+        int uvIndex = (i >> 1) * (width >> 1);
+        for (int j = 0; j < width; j++) {
+            int index = line + j;
+            int uv = uvIndex + (j >> 1);
+            color(y[index], u[uv], v[uv], dest + (index << 2));
         }
     }
 }
 
 void YV12ToArgb(uint8_t *src, uint8_t *dest, int width, int height) {
-    uint8_t y, u, v;
-    int index;
-
     int size = width * height;
-    int indexU = size + size / 4;
+    int indexU = size + (size >> 2);
     for (int h = 0; h < height; h++) {
-        int line = (width / 2) * (h / 2);
+        int line = h * width;
+        int uvIndex = (h >> 1) * (width >> 1);
         for (int w = 0; w < width; w++) {
-            index = w / 2 + line;
-            y = src[width * h + w];
-            v = src[size + index];
-            u = src[indexU + index];
-            int off = (width * h + w) * 4;
-            color(y, u, v, dest + off, dest + off + 1, dest + off + 2);
-            dest[off + 3] = 0xff;
+            int index = line + w;
+            int uv = uvIndex + (w >> 1);
+            color(src[index], src[size + uv], src[indexU + uv], dest + index);
         }
     }
 }
 
-void copyArgb(const uint8_t *src, uint8_t *dest) {
+inline void copyArgb(const uint8_t *src, uint8_t *dest) {
+//    (uint32_t *) dest[0] = (uint32_t *) src[0];
     dest[0] = src[0];
     dest[1] = src[1];
     dest[2] = src[2];
@@ -192,10 +191,11 @@ Java_cn_sskbskdrin_record_YUV_nativeToArgb(JNIEnv *env, jclass type, jbyteArray 
         buff = (uint8_t *) malloc((size_t) (width * height * 4));
     }
 
+//    YV12ToArgb((uint8_t *) src, isRotate ? buff : (uint8_t *) dest, width, height);
+    I420ToARGB(src, src + width * height * 5 / 4, src + width * height, dest, width, height);
     if (format == YV12) {
-        YV12ToArgb((uint8_t *) src, isRotate ? buff : (uint8_t *) dest, width, height);
     } else {
-        NV21ToArgb((uint8_t *) src, isRotate ? buff : (uint8_t *) dest, width, height, format == NV12);
+//        NV21ToArgb((uint8_t *) src, isRotate ? buff : (uint8_t *) dest, width, height, format == NV12);
     }
 
     if (isRotate) {

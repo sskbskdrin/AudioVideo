@@ -7,7 +7,7 @@ import android.util.Log;
  *
  * @author keayuan
  */
-public class LogUtil {
+class LogUtil {
     public static void w(String tag, String s) {
         Log.w(tag, s);
     }

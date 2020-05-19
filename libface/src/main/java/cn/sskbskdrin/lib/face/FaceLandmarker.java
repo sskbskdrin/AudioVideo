@@ -2,6 +2,8 @@ package cn.sskbskdrin.lib.face;
 
 import android.content.Context;
 
+import java.util.Arrays;
+
 public class FaceLandmarker {
     private static final String TAG = "FaceLandmarker";
 
@@ -16,6 +18,10 @@ public class FaceLandmarker {
     }
 
     public int mark(byte[] src, int width, int height, double[] destPoints, int[] rect, int faceCount) {
+        Arrays.fill(destPoints, 0);
+        if (faceCount <= 0) {
+            return 0;
+        }
         long st = System.currentTimeMillis();
         int ret = nativeMark(id, src, width, height, destPoints, rect, faceCount);
         if (LogUtil.isLoggable()) {

@@ -1,3 +1,4 @@
 include ':app', ':kotlinapp'
 include ':libyuv'
 include ':libface'
+include ':libtflite'

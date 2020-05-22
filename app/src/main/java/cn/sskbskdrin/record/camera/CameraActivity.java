@@ -1,5 +1,6 @@
 package cn.sskbskdrin.record.camera;
 
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
@@ -11,12 +12,16 @@ import android.view.Window;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 
 import cn.sskbskdrin.base.BaseActivity;
 import cn.sskbskdrin.lib.face.FaceDetector;
 import cn.sskbskdrin.lib.face.FaceLandmarker;
+import cn.sskbskdrin.lib.tflite.Recognition;
+import cn.sskbskdrin.lib.tflite.TFLiteDetector;
 import cn.sskbskdrin.lib.yuv.YUVCache;
 import cn.sskbskdrin.lib.yuv.YUVLib;
 import cn.sskbskdrin.record.R;
@@ -28,16 +33,22 @@ public class CameraActivity extends BaseActivity {
     private SurfaceView surfaceView;
     private TextureView textureView;
     private DrawSurface drawView;
-    AtomicBoolean isCut = new AtomicBoolean(false);
 
     private boolean v2;
     private boolean front;
     private boolean texture;
+    private boolean face = false;
+    private boolean mark = true;
+    private boolean tf = true;
+
     YUVCache factory = new YUVCache();
     FaceDetector detector;
     FaceLandmarker landmarker;
     int[] faceRect;
     double[] points;
+    TFLiteDetector tfLiteDetector;
+    int[] recognitionRect;
+    Bitmap bitmap;
 
     CameraManager.CameraFrameListener listener = new CameraManager.CameraFrameListener() {
         @Override
@@ -45,25 +56,69 @@ public class CameraActivity extends BaseActivity {
                                   boolean v2) {
             Log.d(TAG, String.format("frame: bytes len=%d %dx%d format=%d", bytes.length, width, height, format));
             int rotate = (cameraManager != null ? cameraManager.getOrientation() : 0) + (front ? 180 : 0);
-            drawView.setSrcFrame(height, width);
+            int size = Math.min(width, height);
+            int[] clip = new int[]{0, 0, size, size};
             if (v2) {
-                drawView.drawBitmap(factory.getBitmap(bytes, uBytes, vBytes, width, height, rotate));
+                factory.transformRGBA(bytes, uBytes, vBytes, clip, width, height, rotate, front, true);
             } else {
-                factory.transformRGBA(bytes, null, width, height, format, rotate, false, false);
+                factory.transformRGBA(bytes, clip, width, height, format, rotate, front, true);
+            }
+            size = 300;
+            factory.scaleRGBA(size, size, 0);
+            drawView.setSrcFrame(size, size);
+            drawView.clean();
+
+            if (bitmap == null) {
+                bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            }
+            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(factory.getRGBA()));
+            //            drawView.drawBitmap(bitmap);
+
+            factory.toggleAlpha(true);
+
+            if (face) {
                 if (detector == null) {
                     detector = new FaceDetector(CameraActivity.this);
                     faceRect = new int[40];
                     landmarker = new FaceLandmarker(CameraActivity.this);
                     points = new double[100];
                 }
-                int face = detector.detect(factory.getRGBA(), height, width, faceRect, 10);
+                Arrays.fill(points, -1);
+                int face = detector.detect(factory.getRGBA(), size, size, faceRect, 10);
                 drawView.drawRect(faceRect, 0xffe00000);
-                if (face > 0) {
-                    landmarker.mark(factory.getRGBA(), height, width, points, faceRect, face);
+                if (mark) {
+                    if (face > 0) {
+                        landmarker.mark(factory.getRGBA(), size, size, points, faceRect, face);
+                    }
+                    drawView.drawPoints(points, Color.GREEN);
                 }
-                drawView.drawPoints(points, Color.GREEN);
-                Log.i(TAG, "faceRect: " + Arrays.toString(points));
             }
+            if (tf) {
+                if (tfLiteDetector == null) {
+                    try {
+                        //                        tfLiteDetector = TFLiteDetector.create(getAssets(), "mnist.tflite",
+                        //                        "label.txt");
+                        tfLiteDetector = TFLiteDetector.create(getAssets(), "detect.tflite", "label.txt");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                if (recognitionRect == null) {
+                    recognitionRect = new int[40];
+                }
+                Arrays.fill(recognitionRect, 0);
+                List<Recognition> list = tfLiteDetector.recognize(factory.getRGBA());
+                for (int i = 0; i < list.size(); i++) {
+                    Recognition res = list.get(i);
+                    res.scaleLocation(recognitionRect, i * 4, size);
+                    drawView.drawText(res.title, recognitionRect[i * 4] + 2, recognitionRect[i * 4 + 1] + 2);
+                }
+                drawView.drawRect(recognitionRect, Color.CYAN);
+                for (Recognition res : list) {
+                    Log.d(TAG, res.toString());
+                }
+            }
+            drawView.end();
         }
     };
 

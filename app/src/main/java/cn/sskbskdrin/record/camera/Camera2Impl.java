@@ -94,6 +94,7 @@ public class Camera2Impl extends CameraManager.ICamera {
 
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraID);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            Log.d(TAG, "connectCamera: support format="+Arrays.toString(map.getOutputFormats()));
             Size[] sizes = map.getOutputSizes(ImageReader.class);
 
             CameraManager.Size previewSize = mManager.selectCameraFrameSize(Arrays.asList(sizes),

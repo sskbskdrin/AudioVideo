@@ -173,6 +173,9 @@ public class YUVCache {
     }
 
     public byte[] scaleRGBA(int width, int height, int quality) {
+        if (width == size.x && height == size.y || width <= 0 || height <= 0) {
+            return dest;
+        }
         checkCache(width * height * 4);
         YUVLib.scaleRGBA(dest, size.x, size.y, cache, width, height, quality);
         byte[] temp = dest;

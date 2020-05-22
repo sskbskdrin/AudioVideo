@@ -118,7 +118,6 @@ public class DrawSurface extends View implements Handler.Callback {
     public void drawBitmap(Bitmap bitmap, int x, int y) {
         Action action = new BitmapAction(bitmap.hashCode(), bitmap, x, y);
         addAction(action);
-        postInvalidate();
     }
 
     public void drawPoint(float x, float y, int color) {
@@ -135,16 +134,25 @@ public class DrawSurface extends View implements Handler.Callback {
 
     private void drawPoints(int id, int color, float radius, float[] points) {
         addAction(new PointAction(id, color, radius, points));
-        postInvalidate();
     }
 
     public void drawRect(int[] rect, int color) {
         addAction(new RectAction(rect.hashCode(), color, tr(rect)));
-        postInvalidate();
+    }
+
+    public void drawText(CharSequence text, float x, float y, AlignMode mode) {
+        addAction(new TextAction(text, x, y, mode));
+    }
+
+    public void drawText(CharSequence text, float x, float y) {
+        addAction(new TextAction(text, x, y, AlignMode.LEFT_TOP));
     }
 
     public void drawLines(int color, int... points) {
         addAction(new LineAction(points.hashCode(), color, tr(points)));
+    }
+
+    public void end() {
         postInvalidate();
     }
 
@@ -295,6 +303,31 @@ public class DrawSurface extends View implements Handler.Callback {
                     canvas.drawRect(params[i], params[i + 1], params[i] + params[i + 2],
                         params[i + 1] + params[i + 3], paint);
                 }
+            }
+        }
+    }
+
+    private static class TextAction extends Action<CharSequence> {
+
+        private float x, y;
+        private AlignMode mode;
+
+        TextAction(CharSequence text, float left, float top, AlignMode mode) {
+            this(text, left, top, Color.RED);
+            paint.setColor(Color.RED);
+            x = left;
+            y = top;
+            this.mode = mode;
+        }
+
+        TextAction(CharSequence text, float left, float top, int color) {
+            super(text.hashCode(), color, text);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            if (params != null) {
+                drawText(canvas, params.toString(), x, y, mode, paint);
             }
         }
     }
